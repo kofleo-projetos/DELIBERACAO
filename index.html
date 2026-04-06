@@ -246,6 +246,11 @@ tbody tr:hover td{background:#f7f9ff;}
 .notif.show{display:flex;}
 .notif.ok{border-color:#6ee7b7;color:#065f46;}
 
+
+/* FOOTER */
+.app-footer{background:var(--surface);border-top:1px solid var(--border);text-align:center;padding:14px 20px;font-size:11px;color:var(--text3);letter-spacing:.04em;}
+.app-footer strong{color:var(--text2);}
+
 /* UTILS */
 .mono{font-family:'JetBrains Mono',monospace;}
 .green{color:#059669;}.red{color:#dc2626;}.blue{color:var(--accent);}.muted{color:var(--text2);}
@@ -367,6 +372,14 @@ tbody tr:hover td{background:#f7f9ff;}
         <label>Construção e Terreno (R$)</label>
         <div class="curr-wrap"><span class="curr-prefix">R$</span><input type="text" id="r-terreno" class="curr-inp" style="width:160px" placeholder="0,00" oninput="maskCurr(this)" onchange="recalcSaldo()"></div>
       </div>
+      <div class="fg">
+        <label>Coletas Especiais (R$)</label>
+        <div class="curr-wrap"><span class="curr-prefix">R$</span><input type="text" id="r-coletas" class="curr-inp" style="width:160px" placeholder="0,00" oninput="maskCurr(this)" onchange="recalcSaldo()"></div>
+      </div>
+      <div class="fg">
+        <label>Outros Valores (R$)</label>
+        <div class="curr-wrap"><span class="curr-prefix">R$</span><input type="text" id="r-outros" class="curr-inp" style="width:160px" placeholder="0,00" oninput="maskCurr(this)" onchange="recalcSaldo();checkOutrosValores(this)"></div>
+      </div>
       <div class="fg" title="Soma dos resgates de provisionados vinculados à data desta reunião">
         <label style="display:flex;align-items:center;gap:5px;">
           Resgate Provisionados (R$)
@@ -381,10 +394,13 @@ tbody tr:hover td{background:#f7f9ff;}
       − <strong id="calc-custos">0,00</strong> (Custos Fixos)
       − <strong id="calc-direc">0,00</strong> (Of. Direcionadas)
       − <strong id="calc-terreno">0,00</strong> (Constr./Terreno)
+      − <strong id="calc-coletas">0,00</strong> (Coletas Especiais)
+      − <strong id="calc-outros">0,00</strong> (Outros Valores)
       + <strong id="calc-resgate" style="color:#16a06e">0,00</strong> (Resgates Provisionados)
       = <strong id="calc-result" style="font-size:14px">R$ 0,00</strong>
     </div>
   </div>
+  <div id="outros-finalidade-display" style="display:none;font-size:11px;color:#b45309;background:#fef9c3;border:1px solid #fcd34d;border-radius:7px;padding:7px 12px;margin-top:-10px;margin-bottom:16px;">📋 Finalidade dos Outros Valores: <strong id="outros-finalidade-text"></strong></div>
 
   <!-- CARTOES -->
   <div class="cards-4">
@@ -485,10 +501,18 @@ tbody tr:hover td{background:#f7f9ff;}
   </div>
 
   <div class="section" style="margin-top:26px">
+    <div class="sec-title">Somatória por Casa de Oração</div>
+    <div class="table-wrap" style="margin-bottom:20px">
+      <table><thead><tr><th>Casa de Oração</th><th>Qtd. Itens</th><th>Total Previsto</th><th>Total Aprovado</th></tr></thead>
+      <tbody id="h-soma-casa"><tr class="empty-row"><td colspan="4">Sem dados</td></tr></tbody></table>
+    </div>
+  </div>
+
+  <div class="section" style="margin-top:26px">
     <div class="sec-title">Resumo por Reunião</div>
     <div class="table-wrap">
-      <table><thead><tr><th>Data</th><th>Total Ofertas</th><th>Disponível</th><th>Itens</th><th>Total Previsto</th><th>Total Aprovado</th><th>Transf. Piedade</th><th>Reserva Terreno</th></tr></thead>
-      <tbody id="h-summary"><tr class="empty-row"><td colspan="8">Sem dados</td></tr></tbody></table>
+      <table><thead><tr><th>Data</th><th>Total Ofertas</th><th>Disponível</th><th>Itens</th><th>Total Previsto</th><th>Total Aprovado</th><th>Transf. Piedade</th><th>Reserva Terreno</th><th>Coletas Especiais</th><th>Outros Valores</th></tr></thead>
+      <tbody id="h-summary"><tr class="empty-row"><td colspan="10">Sem dados</td></tr></tbody></table>
     </div>
   </div>
 </div>
@@ -506,8 +530,9 @@ tbody tr:hover td{background:#f7f9ff;}
   </div>
 
   <div class="stab-content active" id="stab-direcionadas">
-    <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
-      <button class="btn btn-primary btn-sm" onclick="openModal('modal-dir')">Nova Oferta Direcionada</button>
+    <div style="background:#eef3ff;border:1px solid #c5d6fd;border-radius:9px;padding:11px 16px;margin-bottom:14px;font-size:12px;color:#2d4a8a;display:flex;align-items:center;gap:10px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1e6ef4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span>Para lançar uma oferta direcionada, vá à aba <strong>Provisionados</strong>, escolha o provisionado e clique em <strong>Lançar OF. Direcionada</strong>.</span>
     </div>
     <div id="dir-list">
       <div class="empty-row" style="text-align:center;color:var(--text3);padding:40px;background:var(--surface);border:1px solid var(--border);border-radius:9px;">Nenhuma oferta direcionada registrada ainda.</div>
@@ -554,6 +579,12 @@ tbody tr:hover td{background:#f7f9ff;}
     <div class="card" style="--ca:#dc2626"><div class="card-label">Transf. Piedade</div><div class="card-value" id="dc-pia">R$ 0</div><div class="card-sub">Transferências</div></div>
     <div class="card" style="--ca:#0891b2"><div class="card-label">Reserva Terreno</div><div class="card-value" id="dc-ter">R$ 0</div><div class="card-sub">Reservado</div></div>
   </div>
+  <div class="cards-4" style="margin-bottom:22px">
+    <div class="card" style="--ca:#1e40af"><div class="card-label">OF. Direcionadas — Total</div><div class="card-value" id="dc-dir-total">R$ 0</div><div class="card-sub">Lançamentos acumulados</div></div>
+    <div class="card" style="--ca:#059669"><div class="card-label">Provisionados — Total</div><div class="card-value" id="dc-prov-total">R$ 0</div><div class="card-sub">Valor total provisionado</div></div>
+    <div class="card" style="--ca:#16a06e"><div class="card-label">Provisionados — Saldo</div><div class="card-value" id="dc-prov-saldo">R$ 0</div><div class="card-sub">Saldo disponível</div></div>
+    <div class="card" style="--ca:#d97706"><div class="card-label">Coletas Especiais</div><div class="card-value" id="dc-coletas">R$ 0</div><div class="card-sub">Acumulado</div></div>
+  </div>
 
   <div class="grid-2">
     <div class="chart-box">
@@ -568,6 +599,14 @@ tbody tr:hover td{background:#f7f9ff;}
   <div class="chart-box">
     <div class="chart-title">Gastos por Casa de Oração</div>
     <div class="chart-inner"><canvas id="ch-casas"></canvas></div>
+  </div>
+
+  <div class="section">
+    <div class="sec-title">Resumo — Ofertas Direcionadas</div>
+    <div class="table-wrap" style="margin-bottom:20px">
+      <table><thead><tr><th>Descrição</th><th>Casa de Oração</th><th>Lançamentos / Datas</th><th>Total</th></tr></thead>
+      <tbody id="dash-dir-table"><tr class="empty-row"><td colspan="4">Nenhuma oferta direcionada registrada</td></tr></tbody></table>
+    </div>
   </div>
 
   <div class="section">
@@ -659,7 +698,168 @@ tbody tr:hover td{background:#f7f9ff;}
   </div>
 </div>
 
+
+<!-- MODAL: Finalidade Outros Valores -->
+<div class="modal-overlay" id="modal-outros">
+  <div class="modal" style="width:460px">
+    <div class="modal-title">Descrição — Outros Valores</div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Informe a finalidade / motivo deste valor para fins de registro.</p>
+    <div class="fg" style="margin-bottom:18px">
+      <label>Finalidade</label>
+      <textarea id="outros-finalidade" rows="3" style="width:100%;resize:vertical" placeholder="Descreva a finalidade deste lançamento..."></textarea>
+    </div>
+    <div style="display:flex;gap:9px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="closeModal('modal-outros')">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarOutros()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Editar Item da Casa -->
+<div class="modal-overlay" id="modal-edit-item">
+  <div class="modal" style="width:560px">
+    <div class="modal-title">Editar Item</div>
+    <div class="form-row" style="flex-direction:column;gap:12px">
+      <div class="fg"><label>Tipo</label>
+        <select id="edit-tipo" style="width:100%">
+          <option value="manutencao">Manutenção</option>
+          <option value="construcao">Construção</option>
+        </select>
+      </div>
+      <div class="fg"><label>Descrição</label><input type="text" id="edit-desc" style="width:100%" placeholder="Descrição do item"></div>
+      <div style="display:flex;gap:12px">
+        <div class="fg" style="flex:1"><label>Previsto (R$)</label><div class="curr-wrap"><span class="curr-prefix">R$</span><input type="text" id="edit-prev" class="curr-inp" style="width:100%" placeholder="0,00" oninput="maskCurr(this)"></div></div>
+        <div class="fg" style="flex:1"><label>Aprovado (R$)</label><div class="curr-wrap"><span class="curr-prefix">R$</span><input type="text" id="edit-aprov" class="curr-inp" style="width:100%" placeholder="0,00" oninput="maskCurr(this)"></div></div>
+      </div>
+      <div class="fg"><label>Solicitante</label><input type="text" id="edit-sol" style="width:100%" placeholder="Nome / Setor"></div>
+      <div class="fg"><label>Observação</label><input type="text" id="edit-obs-item" style="width:100%" placeholder="Opcional"></div>
+    </div>
+    <div style="display:flex;gap:9px;justify-content:flex-end;margin-top:18px">
+      <button class="btn btn-ghost" onclick="closeModal('modal-edit-item')">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmEditItem()">Salvar Alterações</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Nova Oferta Direcionada (vinculada a provisionado) -->
+<div class="modal-overlay" id="modal-lancamento-dir">
+  <div class="modal" style="width:520px">
+    <div class="modal-title">Lançar Oferta Direcionada</div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:14px">
+      Provisionado: <strong id="lancdir-prov-label">—</strong><br>
+      Saldo disponível: <strong class="mono green" id="lancdir-saldo-label">—</strong>
+    </p>
+    <div class="form-row" style="flex-direction:column;gap:12px">
+      <div class="fg"><label>Data do Lançamento</label><input type="date" id="lancdir-data"></div>
+      <div class="fg"><label>Casa de Oração</label>
+        <select id="lancdir-casa" style="width:100%">
+          <option value="">Selecione...</option>
+          <option>Central</option><option>Parque Santa Inês</option><option>Jardim Vitória</option>
+          <option>Sítio Aparecida</option><option>Morro Grande</option><option>Laranjeiras</option>
+          <option>Serpa</option><option>Piedade</option><option>Vila Rosina</option>
+          <option>Vila Pinheiros</option><option>Jd. Esperança</option><option>Jd. Eucaliptos</option>
+          <option>Vera Tereza</option><option>Outro</option>
+        </select>
+      </div>
+      <div class="fg"><label>Descrição</label><input type="text" id="lancdir-desc" placeholder="Descrição da oferta direcionada"></div>
+      <div class="fg"><label>Valor (R$)</label><div class="curr-wrap"><span class="curr-prefix">R$</span><input type="text" id="lancdir-valor" class="curr-inp" style="width:100%" placeholder="0,00" oninput="maskCurr(this)"></div></div>
+    </div>
+    <div style="display:flex;gap:9px;justify-content:flex-end;margin-top:18px">
+      <button class="btn btn-ghost" onclick="closeModal('modal-lancamento-dir')">Cancelar</button>
+      <button class="btn btn-success" onclick="confirmarLancamentoDirecionada()">Confirmar Lançamento</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Trocar Casa de Oração do Provisionado -->
+<div class="modal-overlay" id="modal-trocar-casa">
+  <div class="modal" style="width:440px">
+    <div class="modal-title">Trocar Casa de Oração</div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Altere a casa de oração do registro: <strong id="trocar-casa-label">—</strong></p>
+    <div class="fg" style="margin-bottom:18px">
+      <label>Nova Casa de Oração</label>
+      <select id="trocar-casa-select" style="width:100%">
+        <option value="">Selecione...</option>
+        <option>Administração</option><option>Central</option>
+        <option>Parque Santa Inês</option><option>Jardim Vitória</option>
+        <option>Sítio Aparecida</option><option>Morro Grande</option>
+        <option>Laranjeiras</option><option>Serpa</option>
+        <option>Piedade</option><option>Vila Rosina</option>
+        <option>Vila Pinheiros</option><option>Jd. Esperança</option>
+        <option>Jd. Eucaliptos</option><option>Vera Tereza</option>
+        <option>Regional</option><option>Outro</option>
+      </select>
+    </div>
+    <div class="fg" style="margin-bottom:18px">
+      <label>Ou nome personalizado</label>
+      <input type="text" id="trocar-casa-custom" style="width:100%" placeholder="Digite aqui...">
+    </div>
+    <div style="display:flex;gap:9px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="closeModal('modal-trocar-casa')">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarTrocarCasa()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Renomear Casa de Oração (bloco da pauta) -->
+<div class="modal-overlay" id="modal-rename-casa">
+  <div class="modal" style="width:440px">
+    <div class="modal-title">Trocar Casa de Oração</div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Seção atual: <strong id="rename-casa-label">—</strong></p>
+    <div class="fg" style="margin-bottom:12px">
+      <label>Selecionar da lista</label>
+      <select id="rename-casa-select" style="width:100%">
+        <option value="">Selecione...</option>
+        <option>Administração</option><option>Central</option>
+        <option>Parque Santa Inês</option><option>Jardim Vitória</option>
+        <option>Sítio Aparecida</option><option>Morro Grande</option>
+        <option>Laranjeiras</option><option>Serpa</option>
+        <option>Piedade</option><option>Vila Rosina</option>
+        <option>Vila Pinheiros</option><option>Jd. Esperança</option>
+        <option>Jd. Eucaliptos</option><option>Vera Tereza</option>
+        <option>Regional</option>
+      </select>
+    </div>
+    <div class="fg" style="margin-bottom:18px">
+      <label>Ou nome personalizado</label>
+      <input type="text" id="rename-casa-custom" style="width:100%" placeholder="Digite aqui...">
+    </div>
+    <div style="display:flex;gap:9px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="closeModal('modal-rename-casa')">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmRenameCasa()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Editar Oferta Direcionada -->
+<div class="modal-overlay" id="modal-edit-dir">
+  <div class="modal" style="width:520px">
+    <div class="modal-title">Editar Oferta Direcionada</div>
+    <div class="form-row" style="flex-direction:column;gap:12px">
+      <div class="fg"><label>Data</label><input type="date" id="editdir-data"></div>
+      <div class="fg"><label>Casa de Oração</label>
+        <select id="editdir-casa" style="width:100%">
+          <option value="">Selecione...</option>
+          <option>Central</option><option>Parque Santa Inês</option><option>Jardim Vitória</option>
+          <option>Sítio Aparecida</option><option>Morro Grande</option><option>Laranjeiras</option>
+          <option>Serpa</option><option>Piedade</option><option>Vila Rosina</option>
+          <option>Vila Pinheiros</option><option>Jd. Esperança</option><option>Jd. Eucaliptos</option>
+          <option>Vera Tereza</option><option>Administração</option><option>Regional</option><option>Outro</option>
+        </select>
+      </div>
+      <div class="fg"><label>Ou nome personalizado</label><input type="text" id="editdir-casa-custom" style="width:100%" placeholder="Deixe em branco para usar a lista acima"></div>
+      <div class="fg"><label>Descrição</label><input type="text" id="editdir-desc" style="width:100%" placeholder="Descrição da oferta direcionada"></div>
+      <div class="fg"><label>Valor (R$)</label><div class="curr-wrap"><span class="curr-prefix">R$</span><input type="text" id="editdir-valor" class="curr-inp" style="width:100%" placeholder="0,00" oninput="maskCurr(this)"></div></div>
+    </div>
+    <div style="display:flex;gap:9px;justify-content:flex-end;margin-top:18px">
+      <button class="btn btn-ghost" onclick="closeModal('modal-edit-dir')">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmEditDirecionada()">Salvar Alterações</button>
+    </div>
+  </div>
+</div>
 </div><!-- /app-root -->
+<footer class="app-footer">Sistema desenvolvido por <strong>Leandro Machado</strong> &nbsp;·&nbsp; CCB Caieiras — Deliberações</footer>
+
 
 <script>
 // ══════════════════════════════════════════════════════════════
@@ -814,6 +1014,8 @@ async function saveDraft(){
     data: document.getElementById('r-data').value,
     ofertas: G('r-ofertas'), piedade: G('r-piedade'),
     custos: G('r-custos'), direc: G('r-direc'), terreno: G('r-terreno'),
+    coletas: G('r-coletas'), outros: G('r-outros'),
+    outrosFinalidade: window._outrosFinalidade||'',
     blocks: JSON.parse(JSON.stringify(blocks)),
     savedAt: new Date().toISOString()
   };
@@ -837,6 +1039,10 @@ async function loadDraft(){
     setCurr('r-custos', draft.custos);
     setCurr('r-direc', draft.direc);
     setCurr('r-terreno', draft.terreno);
+    setCurr('r-coletas', draft.coletas||0);
+    setCurr('r-outros', draft.outros||0);
+    window._outrosFinalidade = draft.outrosFinalidade||'';
+    if(window._outrosFinalidade){ const disp=document.getElementById('outros-finalidade-display'); const txt=document.getElementById('outros-finalidade-text'); if(disp&&txt){ disp.style.display='block'; txt.textContent=window._outrosFinalidade; } }
     blocks = draft.blocks || [];
     updateMeetingHeader();
     recalcSaldo();
@@ -868,15 +1074,18 @@ function hideDraftBanner(){ document.getElementById('draft-banner').classList.re
 
 function recalcSaldo(){
   const of=G('r-ofertas'), pi=G('r-piedade'), cu=G('r-custos'), di=G('r-direc'), te=G('r-terreno');
+  const co=G('r-coletas'), ou=G('r-outros');
   const data = document.getElementById('r-data').value;
   const resgate = calcResgatesParaData(data);
   setCurr('r-resgate', resgate);
-  const disp = Math.max(0, of-pi-cu-di-te) + resgate;
+  const disp = Math.max(0, of-pi-cu-di-te-co-ou) + resgate;
   document.getElementById('calc-ofertas').textContent=N(of);
   document.getElementById('calc-piedade').textContent=N(pi);
   document.getElementById('calc-custos').textContent=N(cu);
   document.getElementById('calc-direc').textContent=N(di);
   document.getElementById('calc-terreno').textContent=N(te);
+  document.getElementById('calc-coletas').textContent=N(co);
+  document.getElementById('calc-outros').textContent=N(ou);
   document.getElementById('calc-resgate').textContent=N(resgate);
   document.getElementById('calc-result').textContent=R(disp);
   updateCards(disp);
@@ -887,9 +1096,10 @@ function recalcSaldo(){
 // ══════════════════════════════════════════════════════════════
 function updateCards(dispOverride){
   const of=G('r-ofertas'), pi=G('r-piedade'), cu=G('r-custos'), di=G('r-direc'), te=G('r-terreno');
+  const co=G('r-coletas'), ou=G('r-outros');
   const data = document.getElementById('r-data').value;
   const resgate = calcResgatesParaData(data);
-  const disp = dispOverride!==undefined ? dispOverride : Math.max(0,of-pi-cu-di-te)+resgate;
+  const disp = dispOverride!==undefined ? dispOverride : Math.max(0,of-pi-cu-di-te-co-ou)+resgate;
   let totPrev=0, totLib=0, totMan=0, totCon=0;
   blocks.forEach(b=>b.items.forEach(i=>{
     if(i.next) return;
@@ -962,6 +1172,7 @@ function renderBlock(b,bi){
         <td style="min-width:85px">${item.solicitante||'—'}</td>
         <td style="color:var(--text2);font-size:12px;max-width:140px">${item.obs||''}</td>
         <td style="display:flex;gap:4px;flex-wrap:nowrap">
+          <button class="btn btn-ghost btn-xs" onclick="openEditItem(${bi},${ii})" title="Editar item">✏️ Editar</button>
           <button class="btn btn-warn btn-xs" onclick="markNext(${bi},${ii})">Próx. mês</button>
           <button class="btn btn-danger btn-xs" onclick="removeItem(${bi},${ii})">Excluir</button>
         </td>
@@ -971,7 +1182,10 @@ function renderBlock(b,bi){
   return `
 <div class="casa-block" id="cb-${bi}">
   <div class="casa-header">
-    <div class="casa-name">${b.casa}</div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div class="casa-name" id="casa-name-${bi}">${b.casa}</div>
+      <button class="btn btn-ghost btn-xs" onclick="openRenameCasa(${bi})" title="Trocar nome da casa de oração" style="font-size:11px;padding:3px 9px;">✏️ Trocar Casa</button>
+    </div>
     <div class="casa-totals">
       <span>Previsto: <strong class="mono blue">${N(totPrev)}</strong></span>
       <span>Aprovado: <strong class="mono green">${N(totAprov)}</strong></span>
@@ -983,7 +1197,7 @@ function renderBlock(b,bi){
       <thead><tr>
         <th style="width:65px"></th><th style="width:105px">Tipo</th><th>Descrição</th>
         <th style="width:120px">Previsto (R$)</th><th style="width:120px">Aprovado (R$)</th>
-        <th style="width:95px">Solicitante</th><th>Observação</th><th style="width:145px">Ações</th>
+        <th style="width:95px">Solicitante</th><th>Observação</th><th style="width:195px">Ações</th>
       </tr></thead>
       <tbody>${rows}</tbody>
       <tfoot><tr class="tfoot-row">
@@ -1064,15 +1278,16 @@ function saveMeeting(){
 
 async function confirmSave(){
   const of=G('r-ofertas'), pi=G('r-piedade'), cu=G('r-custos'), di=G('r-direc'), te=G('r-terreno');
+  const co=G('r-coletas'), ou=G('r-outros');
   const data=document.getElementById('r-data').value;
   const resgate=calcResgatesParaData(data);
-  const disp=Math.max(0,of-pi-cu-di-te)+resgate;
+  const disp=Math.max(0,of-pi-cu-di-te-co-ou)+resgate;
   const carry=blocks.flatMap(b=>b.items.filter(i=>i.next).map(i=>({...i,next:false,casa:b.casa})));
 
   const id = 'meeting_' + data.replace(/-/g,'') + '_' + Date.now();
   const meeting = {
     id, data,
-    ofertas:of, piedade:pi, custos:cu, direc:di, terreno:te, resgate, disponivel:disp,
+    ofertas:of, piedade:pi, custos:cu, direc:di, terreno:te, coletas:co, outros:ou, outrosFinalidade:window._outrosFinalidade||'', resgate, disponivel:disp,
     casas: JSON.parse(JSON.stringify(blocks.map(b=>({...b,items:b.items.filter(i=>!i.next)})))),
     carryForward: carry,
     savedAt: new Date().toISOString()
@@ -1092,7 +1307,8 @@ async function confirmSave(){
     carry.forEach(i=>{ if(!grouped[i.casa]) grouped[i.casa]=[]; grouped[i.casa].push({...i,id:Date.now()+Math.random()}); });
     Object.entries(grouped).forEach(([casa,items])=>blocks.push({casa,items}));
   }
-  ['r-data','r-ofertas','r-piedade','r-custos','r-direc','r-terreno'].forEach(id=>document.getElementById(id).value='');
+  ['r-data','r-ofertas','r-piedade','r-custos','r-direc','r-terreno','r-coletas','r-outros'].forEach(id=>document.getElementById(id).value='');
+  window._outrosFinalidade='';
   document.getElementById('r-resgate').value='';
   hideDraftBanner();
   renderBlocks(); recalcSaldo(); updateMeetingHeader(); closeModal('modal-save');
@@ -1102,7 +1318,9 @@ async function confirmSave(){
 function clearMeeting(){
   if(blocks.length&&!confirm('Limpar todos os dados?')) return;
   blocks=[];
-  ['r-data','r-ofertas','r-piedade','r-custos','r-direc','r-terreno','r-resgate'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  ['r-data','r-ofertas','r-piedade','r-custos','r-direc','r-terreno','r-coletas','r-outros','r-resgate'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  window._outrosFinalidade='';
+  const disp=document.getElementById('outros-finalidade-display'); if(disp) disp.style.display='none';
   renderBlocks(); recalcSaldo(); updateMeetingHeader();
 }
 
@@ -1206,40 +1424,32 @@ async function deleteProvisionado(docId){
 //  RENDER OFERTAS
 // ══════════════════════════════════════════════════════════════
 function renderOfertas(){
-  // Direcionadas
+  // ── Direcionadas ───────────────────────────────────────────
   const dl=document.getElementById('dir-list');
-  if(!direcionadas.length){
-    dl.innerHTML='<div style="text-align:center;color:var(--text3);padding:36px;background:var(--surface);border:1px solid var(--border);border-radius:9px;">Nenhuma oferta direcionada registrada ainda.</div>';
-  } else {
-    dl.innerHTML=direcionadas.map(d=>`
-      <div class="oferta-card">
-        <div class="oferta-card-header">
-          <div>
-            <div class="oferta-card-title">${d.desc}</div>
-            <div class="oferta-card-meta">${d.casa} &nbsp;·&nbsp; ${d.data}</div>
-          </div>
-          <div style="display:flex;align-items:center;gap:10px">
-            <div class="oferta-card-value">${R(d.valor)}</div>
-            <button class="btn btn-danger btn-xs" onclick="deleteDirecionada('${d._docId||d.id}')">Excluir</button>
-          </div>
-        </div>
-      </div>`).join('');
-  }
+  dl.innerHTML=renderDirecionadasComSomatoria(direcionadas, provisionados);
 
-  // Provisionados
+  // ── Provisionados ──────────────────────────────────────────
   const pl=document.getElementById('prov-list');
   if(!provisionados.length){
     pl.innerHTML='<div style="text-align:center;color:var(--text3);padding:36px;background:var(--surface);border:1px solid var(--border);border-radius:9px;">Nenhum valor provisionado registrado ainda.</div>';
   } else {
     pl.innerHTML=provisionados.map(p=>{
       const utilizado=(p.resgates||[]).reduce((a,r)=>a+r.valor,0);
-      const saldo=p.valorTotal-utilizado;
-      const pct=p.valorTotal>0?Math.round(utilizado/p.valorTotal*100):0;
+      const dirLigadas=direcionadas.filter(d=>d.provisionadoId===(p._docId||p.id)).reduce((a,d)=>a+d.valor,0);
+      const totalUsado=utilizado+dirLigadas;
+      const saldo=p.valorTotal-totalUsado;
+      const pct=p.valorTotal>0?Math.round(totalUsado/p.valorTotal*100):0;
       const resgateRows=(p.resgates||[]).length ? (p.resgates||[]).map(r=>`
         <div class="resgate-item">
           <span>${r.data} — ${r.obs||'Resgate'}</span>
           <span class="mono red">− ${R(r.valor)}</span>
-        </div>`).join('') : '<div class="resgate-item muted">Nenhum resgate realizado</div>';
+        </div>`).join('') : '';
+      const dirRows=direcionadas.filter(d=>d.provisionadoId===(p._docId||p.id)).map(d=>`
+        <div class="resgate-item" style="color:#1e40af">
+          <span style="display:flex;align-items:center;gap:5px;"><span style="background:#dbeafe;color:#1e40af;border-radius:3px;font-size:10px;padding:0 5px;font-weight:600;">DIR</span>${d.data} — ${d.desc} (${d.casa})</span>
+          <span class="mono" style="color:#1e40af">− ${R(d.valor)}</span>
+        </div>`).join('');
+      const allRows=(resgateRows+dirRows)||'<div class="resgate-item muted">Nenhum lançamento realizado</div>';
       const docId = p._docId||p.id;
       return `
       <div class="oferta-card">
@@ -1248,20 +1458,26 @@ function renderOfertas(){
             <div class="oferta-card-title">${p.desc}</div>
             <div class="oferta-card-meta">${p.casa} &nbsp;·&nbsp; ${p.data}</div>
           </div>
-          <div style="display:flex;align-items:center;gap:10px">
-            <div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+            <div style="text-align:right">
               <div class="oferta-card-value">${R(p.valorTotal)}</div>
               <div class="oferta-card-remaining">Saldo: <strong class="${saldo<0?'red':'green'}">${R(saldo)}</strong></div>
             </div>
+            <button class="btn btn-primary btn-xs" style="background:#1e40af;color:#fff;border:none" onclick="openLancamentoDirecionada('${docId}')">Lançar OF. Direcionada</button>
             <button class="btn-rescue" onclick="openResgate('${docId}')">Resgatar</button>
+            <button class="btn btn-ghost btn-xs" onclick="openTrocarCasa('prov','${docId}','${p.desc} (${p.casa})')">🏠 Trocar Casa</button>
             <button class="btn btn-danger btn-xs" onclick="deleteProvisionado('${docId}')">Excluir</button>
           </div>
         </div>
-        <div style="height:6px;background:#e5e7eb;border-radius:3px;margin:8px 0 10px;">
+        <div style="height:6px;background:#e5e7eb;border-radius:3px;margin:8px 0 6px;">
           <div style="height:6px;background:${pct>=100?'#dc2626':'#16a06e'};border-radius:3px;width:${Math.min(pct,100)}%"></div>
         </div>
-        <div style="font-size:11px;color:var(--text2);margin-bottom:6px">Utilizado: ${R(utilizado)} (${pct}%)</div>
-        <div class="resgate-list">${resgateRows}</div>
+        <div style="font-size:11px;color:var(--text2);margin-bottom:6px;display:flex;gap:16px;">
+          <span>Total utilizado: <strong class="mono">${R(totalUsado)}</strong> (${pct}%)</span>
+          ${dirLigadas>0?`<span style="color:#1e40af;">OF. Direcionadas: <strong class="mono">${R(dirLigadas)}</strong></span>`:''}
+          ${utilizado>0?`<span style="color:#dc2626;">Resgates: <strong class="mono">${R(utilizado)}</strong></span>`:''}
+        </div>
+        <div class="resgate-list">${allRows}</div>
       </div>`;
     }).join('');
   }
@@ -1301,6 +1517,35 @@ function renderHistorico(){
       <td class="mono green"><strong>${N(i.aprovado)}</strong></td>
     </tr>`).join('') : '<tr class="empty-row"><td colspan="6">Nenhum registro encontrado</td></tr>';
 
+  // ── Somatória por Casa de Oração ──
+  const somaCasa={};
+  meetings.filter(m=>{
+    if(anoF&&!m.data.startsWith(anoF)) return false;
+    if(mesF&&m.data.substring(5,7)!==mesF) return false;
+    return true;
+  }).forEach(m=>(m.casas||[]).forEach(b=>b.items.forEach(i=>{
+    if(!somaCasa[b.casa]) somaCasa[b.casa]={count:0,previsto:0,aprovado:0};
+    somaCasa[b.casa].count++;
+    somaCasa[b.casa].previsto+=i.previsto;
+    somaCasa[b.casa].aprovado+=i.aprovado;
+  })));
+  const somaSorted=Object.entries(somaCasa).sort((a,b)=>b[1].aprovado-a[1].aprovado);
+  const somaTotal={count:0,previsto:0,aprovado:0};
+  somaSorted.forEach(([,v])=>{ somaTotal.count+=v.count; somaTotal.previsto+=v.previsto; somaTotal.aprovado+=v.aprovado; });
+  document.getElementById('h-soma-casa').innerHTML=somaSorted.length ? somaSorted.map(([casa,v])=>`
+    <tr>
+      <td style="font-weight:600">${casa}</td>
+      <td style="text-align:center">${v.count}</td>
+      <td class="mono blue">${N(v.previsto)}</td>
+      <td class="mono green"><strong>${N(v.aprovado)}</strong></td>
+    </tr>`).join('')+`
+    <tr class="tfoot-row">
+      <td style="font-family:'Inter',sans-serif;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em;">TOTAL</td>
+      <td class="mono" style="text-align:center">${somaTotal.count}</td>
+      <td class="mono blue">${N(somaTotal.previsto)}</td>
+      <td class="mono green" style="font-size:14px;">${N(somaTotal.aprovado)}</td>
+    </tr>` : '<tr class="empty-row"><td colspan="4">Sem dados para o filtro selecionado</td></tr>';
+
   document.getElementById('h-summary').innerHTML=meetings.length ? [...meetings].sort((a,b)=>b.data.localeCompare(a.data)).map(m=>{
     const its=(m.casas||[]).flatMap(b=>b.items);
     return `<tr>
@@ -1312,8 +1557,10 @@ function renderHistorico(){
       <td class="mono green"><strong>${N(its.reduce((a,i)=>a+i.aprovado,0))}</strong></td>
       <td class="mono red">${N(m.piedade)}</td>
       <td class="mono" style="color:#0891b2">${N(m.terreno)}</td>
+      <td class="mono" style="color:#059669">${N(m.coletas||0)}</td>
+      <td class="mono" style="color:#d97706">${N(m.outros||0)}${m.outrosFinalidade?` <span title="${m.outrosFinalidade}" style="cursor:help;color:var(--text3)">ℹ️</span>`:''}</td>
     </tr>`;
-  }).join('') : '<tr class="empty-row"><td colspan="8">Sem dados</td></tr>';
+  }).join('') : '<tr class="empty-row"><td colspan="10">Sem dados</td></tr>';
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1425,6 +1672,302 @@ function exportCSV(){
   a.download='deliberacoes.csv'; a.click(); notify('CSV exportado!');
 }
 
+
+// ══════════════════════════════════════════════════════════════
+//  OUTROS VALORES — popup de finalidade
+// ══════════════════════════════════════════════════════════════
+window._outrosFinalidade = '';
+function checkOutrosValores(el){
+  if(parseCurr(el.value)>0){
+    document.getElementById('outros-finalidade').value=window._outrosFinalidade||'';
+    openModal('modal-outros');
+  } else {
+    window._outrosFinalidade='';
+  }
+}
+function confirmarOutros(){
+  window._outrosFinalidade=document.getElementById('outros-finalidade').value.trim();
+  if(!window._outrosFinalidade){ alert('Informe a finalidade do valor.'); return; }
+  closeModal('modal-outros');
+  const disp=document.getElementById('outros-finalidade-display');
+  const txt=document.getElementById('outros-finalidade-text');
+  if(disp&&txt){ disp.style.display='block'; txt.textContent=window._outrosFinalidade; }
+  notify('Finalidade registrada.');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  EDITAR ITEM
+// ══════════════════════════════════════════════════════════════
+let _editBi=-1, _editIi=-1;
+function openEditItem(bi,ii){
+  _editBi=bi; _editIi=ii;
+  const item=blocks[bi].items[ii];
+  document.getElementById('edit-tipo').value=item.tipo;
+  document.getElementById('edit-desc').value=item.desc;
+  document.getElementById('edit-prev').value=item.previsto>0?N(item.previsto):'';
+  document.getElementById('edit-aprov').value=item.aprovado>0?N(item.aprovado):'';
+  document.getElementById('edit-sol').value=item.solicitante||'';
+  document.getElementById('edit-obs-item').value=item.obs||'';
+  openModal('modal-edit-item');
+}
+function confirmEditItem(){
+  if(_editBi<0||_editIi<0) return;
+  const desc=document.getElementById('edit-desc').value.trim();
+  if(!desc){ alert('Informe a descrição.'); return; }
+  blocks[_editBi].items[_editIi]={
+    ...blocks[_editBi].items[_editIi],
+    tipo:document.getElementById('edit-tipo').value,
+    desc,
+    previsto:parseCurr(document.getElementById('edit-prev').value),
+    aprovado:parseCurr(document.getElementById('edit-aprov').value),
+    solicitante:document.getElementById('edit-sol').value.trim(),
+    obs:document.getElementById('edit-obs-item').value.trim()
+  };
+  closeModal('modal-edit-item');
+  renderBlocks(); updateCards(); notify('Item atualizado.');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  NOVA LÓGICA OFERTAS DIRECIONADAS — vinculada a provisionado
+// ══════════════════════════════════════════════════════════════
+let _lancDirProvId=null;
+
+function openLancamentoDirecionada(docId){
+  const p=provisionados.find(x=>x._docId===docId||x.id===docId);
+  if(!p){ alert('Provisionado não encontrado.'); return; }
+  const utilizado=(p.resgates||[]).reduce((a,r)=>a+r.valor,0);
+  // Also count direcionadas already linked to this provisionado
+  const dirLigadas=direcionadas.filter(d=>d.provisionadoId===docId).reduce((a,d)=>a+d.valor,0);
+  const saldo=p.valorTotal-utilizado-dirLigadas;
+  if(saldo<=0){ alert('Saldo insuficiente para lançar oferta direcionada neste provisionado.'); return; }
+  _lancDirProvId=docId;
+  document.getElementById('lancdir-prov-label').textContent=p.desc+' ('+p.casa+')';
+  document.getElementById('lancdir-saldo-label').textContent=R(saldo);
+  document.getElementById('lancdir-data').value='';
+  document.getElementById('lancdir-casa').value='';
+  document.getElementById('lancdir-desc').value='';
+  document.getElementById('lancdir-valor').value='';
+  openModal('modal-lancamento-dir');
+}
+
+async function confirmarLancamentoDirecionada(){
+  if(!_lancDirProvId){ return; }
+  const p=provisionados.find(x=>x._docId===_lancDirProvId||x.id===_lancDirProvId);
+  if(!p) return;
+  const casa=document.getElementById('lancdir-casa').value;
+  const desc=document.getElementById('lancdir-desc').value.trim();
+  const valor=parseCurr(document.getElementById('lancdir-valor').value);
+  const data=document.getElementById('lancdir-data').value;
+  if(!casa||!desc||!valor||!data){ alert('Preencha todos os campos.'); return; }
+
+  const utilizado=(p.resgates||[]).reduce((a,r)=>a+r.valor,0);
+  const dirLigadas=direcionadas.filter(d=>d.provisionadoId===_lancDirProvId).reduce((a,d)=>a+d.valor,0);
+  const saldo=p.valorTotal-utilizado-dirLigadas;
+  if(valor>saldo){ alert('Valor excede o saldo disponível ('+R(saldo)+').'); return; }
+
+  const id='dir_'+Date.now();
+  setSyncing();
+  try {
+    await window._fb.setDoc(window._fb.doc(window._db,'direcionadas',id),
+      {id,data,casa,desc,valor,provisionadoId:_lancDirProvId,provisionadoDesc:p.desc});
+    setSynced();
+    closeModal('modal-lancamento-dir');
+    notify('Oferta direcionada lançada! Saldo do provisionado atualizado.');
+  } catch(e){ setSyncErr(); alert('Erro: '+e.message); }
+}
+
+
+
+// ══════════════════════════════════════════════════════════════
+//  RENOMEAR CASA DE ORAÇÃO (bloco da pauta)
+// ══════════════════════════════════════════════════════════════
+let _renameCasaBi=-1;
+function openRenameCasa(bi){
+  _renameCasaBi=bi;
+  document.getElementById('rename-casa-label').textContent=blocks[bi].casa;
+  document.getElementById('rename-casa-select').value='';
+  document.getElementById('rename-casa-custom').value='';
+  openModal('modal-rename-casa');
+}
+function confirmRenameCasa(){
+  const nova=(document.getElementById('rename-casa-custom').value.trim()||document.getElementById('rename-casa-select').value).trim();
+  if(!nova){ alert('Selecione ou digite o nome da nova casa de oração.'); return; }
+  const antiga=blocks[_renameCasaBi].casa;
+  if(nova===antiga){ closeModal('modal-rename-casa'); return; }
+  if(blocks.find((b,i)=>i!==_renameCasaBi&&b.casa===nova)){ alert(`A seção "${nova}" já existe. Escolha um nome diferente.`); return; }
+  blocks[_renameCasaBi].casa=nova;
+  closeModal('modal-rename-casa');
+  renderBlocks(); updateCards();
+  notify(`Seção renomeada para "${nova}".`);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  TROCAR CASA DE ORAÇÃO
+// ══════════════════════════════════════════════════════════════
+let _trocarCasaTipo=null, _trocarCasaDocId=null;
+function openTrocarCasa(tipo, docId, label){
+  _trocarCasaTipo=tipo; _trocarCasaDocId=docId;
+  document.getElementById('trocar-casa-label').textContent=label;
+  document.getElementById('trocar-casa-select').value='';
+  document.getElementById('trocar-casa-custom').value='';
+  openModal('modal-trocar-casa');
+}
+async function confirmarTrocarCasa(){
+  const nova=(document.getElementById('trocar-casa-custom').value.trim()||document.getElementById('trocar-casa-select').value).trim();
+  if(!nova){ alert('Selecione ou digite o nome da nova casa de oração.'); return; }
+  setSyncing();
+  try {
+    const col=_trocarCasaTipo==='prov'?'provisionados':'direcionadas';
+    const ref=window._fb.doc(window._db, col, _trocarCasaDocId);
+    const snap=await window._fb.getDoc(ref);
+    if(!snap.exists()){ alert('Registro não encontrado.'); setSynced(); return; }
+    await window._fb.setDoc(ref, {...snap.data(), casa:nova}, {merge:true});
+    setSynced();
+    closeModal('modal-trocar-casa');
+    notify('Casa de oração atualizada!');
+  } catch(e){ setSyncErr(); alert('Erro: '+e.message); }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SOMATÓRIA POR DESTINO (OFERTAS DIRECIONADAS)
+//  Agrupa por: desc + casa — mostra total e datas ao expandir
+// ══════════════════════════════════════════════════════════════
+function toggleDirGroup(id){
+  const el=document.getElementById('dirgroup-'+id);
+  const btn=document.getElementById('dirgroupbtn-'+id);
+  if(!el) return;
+  const open=el.style.display==='none'||el.style.display==='';
+  el.style.display=open?'block':'none';
+  if(btn) btn.textContent=open?'▲ Recolher':'▼ Ver datas';
+}
+
+function renderDirecionadasComSomatoria(direcionadas, provisionados){
+  if(!direcionadas.length){
+    return '<div style="text-align:center;color:var(--text3);padding:36px;background:var(--surface);border:1px solid var(--border);border-radius:9px;">Nenhuma oferta direcionada lançada ainda.<br><small style="font-size:11px;margin-top:6px;display:block;">Para lançar uma oferta direcionada, abra um Provisionado na aba "Provisionados" e clique em "Lançar Oferta Direcionada".</small></div>';
+  }
+
+  // Agrupar por desc+casa
+  const groupMap={};
+  direcionadas.forEach(d=>{
+    const key=`${d.desc.trim()}|||${d.casa.trim()}`;
+    if(!groupMap[key]) groupMap[key]={desc:d.desc,casa:d.casa,total:0,itens:[]};
+    groupMap[key].total+=d.valor;
+    groupMap[key].itens.push(d);
+  });
+
+  const groups=Object.values(groupMap).sort((a,b)=>b.total-a.total);
+  const grandTotal=groups.reduce((s,g)=>s+g.total,0);
+
+  let html='';
+
+  // Cabeçalho somatória
+  html+=`<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:9px;padding:11px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+    <div style="font-size:12px;color:#0369a1;font-weight:600;">📊 Somatória Geral — ${groups.length} destino(s)</div>
+    <div class="mono" style="font-size:15px;font-weight:700;color:#0369a1;">${R(grandTotal)}</div>
+  </div>`;
+
+  groups.forEach((g,gi)=>{
+    const itensOrdenados=[...g.itens].sort((a,b)=>b.data.localeCompare(a.data));
+    const uid='dg'+gi;
+    const hasMultiple=g.itens.length>1;
+
+    html+=`<div class="oferta-card" style="margin-bottom:10px;">
+      <div class="oferta-card-header">
+        <div style="flex:1;min-width:0">
+          <div class="oferta-card-title">${g.desc}</div>
+          <div class="oferta-card-meta">${g.casa} &nbsp;·&nbsp; ${g.itens.length} lançamento(s)</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end">
+          <div style="text-align:right">
+            <div class="oferta-card-value">${R(g.total)}</div>
+            ${hasMultiple?`<div style="font-size:10px;color:var(--text3)">somatória</div>`:''}
+          </div>
+          ${hasMultiple?`<button id="dirgroupbtn-${uid}" class="btn btn-ghost btn-xs" onclick="toggleDirGroup('${uid}')">▼ Ver datas</button>`:''}
+        </div>
+      </div>`;
+
+    if(hasMultiple){
+      // Tabela de lançamentos (inicialmente oculta)
+      html+=`<div id="dirgroup-${uid}" style="display:none;margin-top:8px;border-top:1px dashed var(--border);padding-top:8px;">`;
+      html+=itensOrdenados.map(d=>{
+        const prov=d.provisionadoId?provisionados.find(p=>p._docId===d.provisionadoId||p.id===d.provisionadoId):null;
+        return `<div class="resgate-item">
+          <span style="display:flex;align-items:center;gap:6px;">
+            <span class="mono" style="font-size:11px;color:var(--text2);">${d.data}</span>
+            ${prov?`<span class="badge b-dir" style="font-size:10px;">${prov.desc}</span>`:''}
+          </span>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span class="mono blue">${R(d.valor)}</span>
+            <button class="btn btn-ghost btn-xs" onclick="openEditDirecionada('${d._docId||d.id}')">✏️ Editar</button>
+            <button class="btn btn-danger btn-xs" onclick="deleteDirecionada('${d._docId||d.id}')">Excluir</button>
+          </div>
+        </div>`;
+      }).join('');
+      html+='</div>';
+    } else {
+      // Item único — mostra data e botões inline
+      const d=itensOrdenados[0];
+      html+=`<div style="margin-top:6px;display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--text2);">
+        <span class="mono">${d.data}</span>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-ghost btn-xs" onclick="openEditDirecionada('${d._docId||d.id}')">✏️ Editar</button>
+          <button class="btn btn-danger btn-xs" onclick="deleteDirecionada('${d._docId||d.id}')">Excluir</button>
+        </div>
+      </div>`;
+    }
+
+    html+='</div>';
+  });
+
+  return html;
+}
+
+
+// ══════════════════════════════════════════════════════════════
+//  EDITAR OFERTA DIRECIONADA
+// ══════════════════════════════════════════════════════════════
+let _editDirDocId=null;
+function openEditDirecionada(docId){
+  const d=direcionadas.find(x=>x._docId===docId||x.id===docId);
+  if(!d){ alert('Lançamento não encontrado.'); return; }
+  _editDirDocId=docId;
+  document.getElementById('editdir-data').value=d.data||'';
+  // tenta selecionar na lista; se não achar, coloca no custom
+  const sel=document.getElementById('editdir-casa');
+  const opt=[...sel.options].map(o=>o.value);
+  if(opt.includes(d.casa)){
+    sel.value=d.casa;
+    document.getElementById('editdir-casa-custom').value='';
+  } else {
+    sel.value='';
+    document.getElementById('editdir-casa-custom').value=d.casa||'';
+  }
+  document.getElementById('editdir-desc').value=d.desc||'';
+  document.getElementById('editdir-valor').value=d.valor>0?N(d.valor):'';
+  openModal('modal-edit-dir');
+}
+async function confirmEditDirecionada(){
+  if(!_editDirDocId) return;
+  const d=direcionadas.find(x=>x._docId===_editDirDocId||x.id===_editDirDocId);
+  if(!d) return;
+  const data=document.getElementById('editdir-data').value;
+  const casa=(document.getElementById('editdir-casa-custom').value.trim()||document.getElementById('editdir-casa').value).trim();
+  const desc=document.getElementById('editdir-desc').value.trim();
+  const valor=parseCurr(document.getElementById('editdir-valor').value);
+  if(!data||!casa||!desc||!valor){ alert('Preencha todos os campos.'); return; }
+  setSyncing();
+  try {
+    await window._fb.setDoc(
+      window._fb.doc(window._db,'direcionadas',_editDirDocId),
+      {...d, data, casa, desc, valor},
+      {merge:true}
+    );
+    setSynced();
+    closeModal('modal-edit-dir');
+    notify('Oferta direcionada atualizada!');
+  } catch(e){ setSyncErr(); alert('Erro: '+e.message); }
+}
+
 // ══════════════════════════════════════════════════════════════
 //  DASHBOARD
 // ══════════════════════════════════════════════════════════════
@@ -1454,6 +1997,47 @@ function renderDash(){
   document.getElementById('dc-man').textContent=R(tMan);
   document.getElementById('dc-pia').textContent=R(tPia);
   document.getElementById('dc-ter').textContent=R(tTer);
+
+  // Novos cards: Ofertas Direcionadas, Provisionados e Coletas
+  const tDir=direcionadas.reduce((a,d)=>a+d.valor,0);
+  const tProvTotal=provisionados.reduce((a,p)=>a+p.valorTotal,0);
+  const tProvUsado=provisionados.reduce((a,p)=>{
+    const res=(p.resgates||[]).reduce((s,r)=>s+r.valor,0);
+    const dl=direcionadas.filter(d=>d.provisionadoId===(p._docId||p.id)).reduce((s,d)=>s+d.valor,0);
+    return a+res+dl;
+  },0);
+  const tProvSaldo=tProvTotal-tProvUsado;
+  const tColetas=mFiltered.reduce((a,m)=>a+(m.coletas||0),0);
+  document.getElementById('dc-dir-total').textContent=R(tDir);
+  document.getElementById('dc-prov-total').textContent=R(tProvTotal);
+  document.getElementById('dc-prov-saldo').textContent=R(tProvSaldo);
+  document.getElementById('dc-coletas').textContent=R(tColetas);
+
+  // Tabela somatória de Ofertas Direcionadas no Dashboard
+  const dirTb=document.getElementById('dash-dir-table');
+  if(!direcionadas.length){
+    dirTb.innerHTML='<tr class="empty-row"><td colspan="4">Nenhuma oferta direcionada registrada</td></tr>';
+  } else {
+    // Agrupar por desc+casa e somar
+    const dirGroupMap={};
+    direcionadas.forEach(d=>{
+      const key=`${d.desc.trim()}|||${d.casa.trim()}`;
+      if(!dirGroupMap[key]) dirGroupMap[key]={desc:d.desc,casa:d.casa,total:0,count:0,datas:[]};
+      dirGroupMap[key].total+=d.valor;
+      dirGroupMap[key].count++;
+      dirGroupMap[key].datas.push(d.data);
+    });
+    const dirGroups=Object.values(dirGroupMap).sort((a,b)=>b.total-a.total);
+    const dirGrandTotal=dirGroups.reduce((s,g)=>s+g.total,0);
+    dirTb.innerHTML=dirGroups.map(g=>`
+      <tr>
+        <td style="max-width:220px;font-weight:600">${g.desc}</td>
+        <td>${g.casa}</td>
+        <td style="font-size:11px;color:var(--text2)">${g.count} lançamento(s)<br><span class="mono" style="font-size:10px;">${[...new Set(g.datas)].sort().reverse().slice(0,3).join(', ')}${g.datas.length>3?' ...':''}</span></td>
+        <td class="mono blue"><strong>${N(g.total)}</strong></td>
+      </tr>`).join('')+`
+      <tr class="tfoot-row"><td colspan="3" style="text-align:right;font-size:11px;color:var(--text2);font-family:'Inter',sans-serif;font-weight:600;letter-spacing:.06em;">TOTAL GERAL</td><td class="mono blue" style="font-size:14px;font-weight:700;">${N(dirGrandTotal)}</td></tr>`;
+  }
 
   const dtb=document.getElementById('dash-table');
   const recMap=mFiltered.flatMap(m=>(m.casas||[]).flatMap(b=>b.items.map(i=>({...i,_casa:b.casa,_data:m.data}))));
