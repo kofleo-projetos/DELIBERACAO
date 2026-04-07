@@ -351,7 +351,7 @@ tbody tr:hover td{background:#f7f9ff;}
   <div class="section">
     <div class="sec-title">Dados da Reunião</div>
     <div class="form-row">
-      <div class="fg"><label>Data da Reunião</label><input type="date" id="r-data" onchange="updateMeetingHeader();recalcSaldo()"></div>
+      <div class="fg"><label>Data da Reunião</label><input type="date" id="r-data" onchange="updateMeetingHeader();autoFillDirec()"></div>
       <div class="fg">
         <label>Total Ofertas Mês Anterior (R$)</label>
         <div class="curr-wrap"><span class="curr-prefix">R$</span><input type="text" id="r-ofertas" class="curr-inp" style="width:175px" placeholder="0,00" oninput="maskCurr(this)" onchange="recalcSaldo()"></div>
@@ -364,9 +364,13 @@ tbody tr:hover td{background:#f7f9ff;}
         <label>Custos Fixos (R$)</label>
         <div class="curr-wrap"><span class="curr-prefix">R$</span><input type="text" id="r-custos" class="curr-inp" style="width:140px" placeholder="0,00" oninput="maskCurr(this)" onchange="recalcSaldo()"></div>
       </div>
-      <div class="fg">
-        <label>Ofertas Direcionadas (R$)</label>
-        <div class="curr-wrap"><span class="curr-prefix">R$</span><input type="text" id="r-direc" class="curr-inp" style="width:160px" placeholder="0,00" oninput="maskCurr(this)" onchange="recalcSaldo()"></div>
+      <div class="fg" title="Preenchido automaticamente com o total de Ofertas Direcionadas do mês desta reunião">
+        <label style="display:flex;align-items:center;gap:5px;">
+          Ofertas Direcionadas (R$)
+          <span style="background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;border-radius:4px;font-size:10px;padding:1px 6px;font-weight:600;">AUTO</span>
+        </label>
+        <div class="curr-wrap"><span class="curr-prefix" style="color:#1e40af">R$</span><input type="text" id="r-direc" class="curr-inp" style="width:160px;background:#eff6ff;border-color:#93c5fd;color:#1e40af;font-weight:600;" placeholder="0,00" readonly tabindex="-1"></div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px;">Da aba Ofertas Direcionadas</div>
       </div>
       <div class="fg">
         <label>Construção e Terreno (R$)</label>
@@ -530,6 +534,48 @@ tbody tr:hover td{background:#f7f9ff;}
   </div>
 
   <div class="stab-content active" id="stab-direcionadas">
+    <!-- Filtro por mês/ano -->
+    <div class="filter-bar" style="margin-bottom:14px">
+      <div class="fg"><label>Filtrar por Ano</label>
+        <select id="dir-ano" onchange="renderOfertas()" style="width:115px">
+          <option value="">Todos os anos</option>
+        </select>
+      </div>
+      <div class="fg"><label>Filtrar por Mês</label>
+        <select id="dir-mes" onchange="renderOfertas()" style="width:155px">
+          <option value="">Todos os meses</option>
+          <option value="01">Janeiro</option><option value="02">Fevereiro</option>
+          <option value="03">Março</option><option value="04">Abril</option>
+          <option value="05">Maio</option><option value="06">Junho</option>
+          <option value="07">Julho</option><option value="08">Agosto</option>
+          <option value="09">Setembro</option><option value="10">Outubro</option>
+          <option value="11">Novembro</option><option value="12">Dezembro</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Cards de saldo -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px;">
+      <div class="card" style="--ca:#6366f1">
+        <div class="card-label">Saldo Mês Anterior</div>
+        <div class="curr-wrap" style="margin-top:4px">
+          <span class="curr-prefix" style="color:#6366f1">R$</span>
+          <input type="text" id="dir-saldo-anterior" class="curr-inp ii" style="width:145px;border-color:#a5b4fc;color:#4338ca;font-weight:600;" placeholder="0,00" oninput="maskCurr(this);atualizaCardsDir()">
+        </div>
+        <div class="card-sub">Editável — informe o saldo do mês anterior</div>
+      </div>
+      <div class="card" style="--ca:#0891b2">
+        <div class="card-label">Saldo Atual</div>
+        <div class="card-value" id="dir-card-atual">R$ 0,00</div>
+        <div class="card-sub" id="dir-card-atual-sub">Soma do período filtrado</div>
+      </div>
+      <div class="card" style="--ca:#16a06e">
+        <div class="card-label">Saldo Total</div>
+        <div class="card-value" id="dir-card-total">R$ 0,00</div>
+        <div class="card-sub">Mês Anterior + Atual</div>
+      </div>
+    </div>
+
     <div style="background:#eef3ff;border:1px solid #c5d6fd;border-radius:9px;padding:11px 16px;margin-bottom:14px;font-size:12px;color:#2d4a8a;display:flex;align-items:center;gap:10px;">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1e6ef4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
       <span>Para lançar uma oferta direcionada, vá à aba <strong>Provisionados</strong>, escolha o provisionado e clique em <strong>Lançar OF. Direcionada</strong>.</span>
@@ -857,14 +903,58 @@ tbody tr:hover td{background:#f7f9ff;}
     </div>
   </div>
 </div>
+<!-- MODAL: Editar Provisionado -->
+<div class="modal-overlay" id="modal-edit-prov">
+  <div class="modal" style="width:520px">
+    <div class="modal-title">Editar Provisionado</div>
+    <div class="form-row" style="flex-direction:column;gap:12px">
+      <div class="fg"><label>Data</label><input type="date" id="editprov-data"></div>
+      <div class="fg"><label>Casa de Oração</label>
+        <select id="editprov-casa" style="width:100%">
+          <option value="">Selecione...</option>
+          <option>Administração</option><option>Central</option>
+          <option>Parque Santa Inês</option><option>Jardim Vitória</option>
+          <option>Sítio Aparecida</option><option>Morro Grande</option>
+          <option>Laranjeiras</option><option>Serpa</option>
+          <option>Piedade</option><option>Vila Rosina</option>
+          <option>Vila Pinheiros</option><option>Jd. Esperança</option>
+          <option>Jd. Eucaliptos</option><option>Vera Tereza</option>
+          <option>Regional</option><option>Outro</option>
+        </select>
+      </div>
+      <div class="fg"><label>Ou nome personalizado</label><input type="text" id="editprov-casa-custom" style="width:100%" placeholder="Deixe em branco para usar a lista acima"></div>
+      <div class="fg"><label>Descrição</label><input type="text" id="editprov-desc" style="width:100%" placeholder="Descrição do provisionado"></div>
+      <div class="fg"><label>Valor Total (R$)</label><div class="curr-wrap"><span class="curr-prefix">R$</span><input type="text" id="editprov-valor" class="curr-inp" style="width:100%" placeholder="0,00" oninput="maskCurr(this)"></div></div>
+    </div>
+    <div style="display:flex;gap:9px;justify-content:flex-end;margin-top:18px">
+      <button class="btn btn-ghost" onclick="closeModal('modal-edit-prov')">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmEditProvisionado()">Salvar Alterações</button>
+    </div>
+  </div>
+</div>
+
 </div><!-- /app-root -->
 <footer class="app-footer">Sistema desenvolvido por <strong>Leandro Machado</strong> &nbsp;·&nbsp; CCB Caieiras — Deliberações</footer>
 
 
 <script>
-// ══════════════════════════════════════════════════════════════
-//  FIREBASE AUTH HELPERS (use window._auth / window._fb)
-// ══════════════════════════════════════════════════════════════
+function atualizaCardsDir(){
+  renderOfertas();
+}
+
+// Auto-fill r-direc from direcionadas for the meeting month
+function autoFillDirec(){
+  const data = document.getElementById('r-data').value;
+  if(!data) { setCurr('r-direc', 0); recalcSaldo(); return; }
+  const mes = data.substring(5,7);
+  const ano = data.substring(0,4);
+  const total = direcionadas.filter(d=>d.data&&d.data.startsWith(ano)&&d.data.substring(5,7)===mes)
+                             .reduce((a,d)=>a+d.valor,0);
+  setCurr('r-direc', total);
+  recalcSaldo();
+}
+
+
 async function doLogout(){
   if(!confirm('Deseja sair?')) return;
   await window._fb.signOut(window._auth);
@@ -913,6 +1003,7 @@ window._appInit = function(){
     snap => {
       direcionadas = snap.docs.map(d => ({ ...d.data(), _docId: d.id }));
       renderOfertas();
+      autoFillDirec();
     },
     () => setSyncErr()
   );
@@ -1037,7 +1128,6 @@ async function loadDraft(){
     setCurr('r-ofertas', draft.ofertas);
     setCurr('r-piedade', draft.piedade);
     setCurr('r-custos', draft.custos);
-    setCurr('r-direc', draft.direc);
     setCurr('r-terreno', draft.terreno);
     setCurr('r-coletas', draft.coletas||0);
     setCurr('r-outros', draft.outros||0);
@@ -1318,10 +1408,10 @@ async function confirmSave(){
 function clearMeeting(){
   if(blocks.length&&!confirm('Limpar todos os dados?')) return;
   blocks=[];
-  ['r-data','r-ofertas','r-piedade','r-custos','r-direc','r-terreno','r-coletas','r-outros','r-resgate'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  ['r-data','r-ofertas','r-piedade','r-custos','r-terreno','r-coletas','r-outros','r-resgate'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   window._outrosFinalidade='';
   const disp=document.getElementById('outros-finalidade-display'); if(disp) disp.style.display='none';
-  renderBlocks(); recalcSaldo(); updateMeetingHeader();
+  renderBlocks(); recalcSaldo(); updateMeetingHeader(); autoFillDirec();
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1424,9 +1514,39 @@ async function deleteProvisionado(docId){
 //  RENDER OFERTAS
 // ══════════════════════════════════════════════════════════════
 function renderOfertas(){
-  // ── Direcionadas ───────────────────────────────────────────
+  const anoF = (document.getElementById('dir-ano')||{}).value || '';
+  const mesF = (document.getElementById('dir-mes')||{}).value || '';
+
+  // Populate year select
+  const anos = [...new Set(direcionadas.map(d=>d.data?d.data.substring(0,4):null).filter(Boolean))].sort().reverse();
+  const aS = anoF;
+  const dirAnoEl = document.getElementById('dir-ano');
+  if(dirAnoEl){
+    dirAnoEl.innerHTML = '<option value="">Todos os anos</option>' +
+      anos.map(a=>`<option${a===aS?' selected':''} value="${a}">${a}</option>`).join('');
+  }
+
+  // Filter direcionadas by month/year
+  const dirFiltradas = direcionadas.filter(d=>{
+    if(!d.data) return true;
+    if(anoF && !d.data.startsWith(anoF)) return false;
+    if(mesF && d.data.substring(5,7) !== mesF) return false;
+    return true;
+  });
+
+  // Update balance cards
+  const saldoAtual = dirFiltradas.reduce((a,d)=>a+d.valor,0);
+  const saldoAnteriorEl = document.getElementById('dir-saldo-anterior');
+  const saldoAnterior = saldoAnteriorEl ? parseCurr(saldoAnteriorEl.value) : 0;
+  const saldoTotal = saldoAnterior + saldoAtual;
+  if(document.getElementById('dir-card-atual')) document.getElementById('dir-card-atual').textContent = R(saldoAtual);
+  if(document.getElementById('dir-card-total')) document.getElementById('dir-card-total').textContent = R(saldoTotal);
+  const subLabel = mesF ? `${MESES[+mesF]}${anoF?' '+anoF:''}` : (anoF ? anoF : 'Todos os períodos');
+  if(document.getElementById('dir-card-atual-sub')) document.getElementById('dir-card-atual-sub').textContent = subLabel;
+
+  // ── Direcionadas list (filtered) ───────────────────────────
   const dl=document.getElementById('dir-list');
-  dl.innerHTML=renderDirecionadasComSomatoria(direcionadas, provisionados);
+  dl.innerHTML=renderDirecionadasComSomatoria(dirFiltradas, provisionados);
 
   // ── Provisionados ──────────────────────────────────────────
   const pl=document.getElementById('prov-list');
@@ -1465,7 +1585,7 @@ function renderOfertas(){
             </div>
             <button class="btn btn-primary btn-xs" style="background:#1e40af;color:#fff;border:none" onclick="openLancamentoDirecionada('${docId}')">Lançar OF. Direcionada</button>
             <button class="btn-rescue" onclick="openResgate('${docId}')">Resgatar</button>
-            <button class="btn btn-ghost btn-xs" onclick="openTrocarCasa('prov','${docId}','${p.desc} (${p.casa})')">🏠 Trocar Casa</button>
+            <button class="btn btn-ghost btn-xs" onclick="openEditProvisionado('${docId}')">✏️ Editar</button>
             <button class="btn btn-danger btn-xs" onclick="deleteProvisionado('${docId}')">Excluir</button>
           </div>
         </div>
@@ -1728,8 +1848,50 @@ function confirmEditItem(){
 }
 
 // ══════════════════════════════════════════════════════════════
-//  NOVA LÓGICA OFERTAS DIRECIONADAS — vinculada a provisionado
+//  EDITAR PROVISIONADO
 // ══════════════════════════════════════════════════════════════
+let _editProvDocId=null;
+function openEditProvisionado(docId){
+  const p=provisionados.find(x=>x._docId===docId||x.id===docId);
+  if(!p){ alert('Provisionado não encontrado.'); return; }
+  _editProvDocId=docId;
+  document.getElementById('editprov-data').value=p.data||'';
+  const sel=document.getElementById('editprov-casa');
+  const opts=[...sel.options].map(o=>o.value);
+  if(opts.includes(p.casa)){
+    sel.value=p.casa;
+    document.getElementById('editprov-casa-custom').value='';
+  } else {
+    sel.value='';
+    document.getElementById('editprov-casa-custom').value=p.casa||'';
+  }
+  document.getElementById('editprov-desc').value=p.desc||'';
+  document.getElementById('editprov-valor').value=p.valorTotal>0?N(p.valorTotal):'';
+  openModal('modal-edit-prov');
+}
+async function confirmEditProvisionado(){
+  if(!_editProvDocId) return;
+  const p=provisionados.find(x=>x._docId===_editProvDocId||x.id===_editProvDocId);
+  if(!p) return;
+  const data=document.getElementById('editprov-data').value;
+  const casa=(document.getElementById('editprov-casa-custom').value.trim()||document.getElementById('editprov-casa').value).trim();
+  const desc=document.getElementById('editprov-desc').value.trim();
+  const valor=parseCurr(document.getElementById('editprov-valor').value);
+  if(!data||!casa||!desc||!valor){ alert('Preencha todos os campos.'); return; }
+  setSyncing();
+  try {
+    await window._fb.setDoc(
+      window._fb.doc(window._db,'provisionados',_editProvDocId),
+      {...p, data, casa, desc, valorTotal:valor},
+      {merge:true}
+    );
+    setSynced();
+    closeModal('modal-edit-prov');
+    notify('Provisionado atualizado!');
+  } catch(e){ setSyncErr(); alert('Erro: '+e.message); }
+}
+
+
 let _lancDirProvId=null;
 
 function openLancamentoDirecionada(docId){
@@ -1747,6 +1909,12 @@ function openLancamentoDirecionada(docId){
   document.getElementById('lancdir-casa').value='';
   document.getElementById('lancdir-desc').value='';
   document.getElementById('lancdir-valor').value='';
+  // Mudar para a aba Direcionadas
+  document.querySelectorAll('.stab').forEach(e=>e.classList.remove('active'));
+  document.querySelectorAll('.stab-content').forEach(e=>e.classList.remove('active'));
+  document.getElementById('stab-direcionadas').classList.add('active');
+  const stabs=document.querySelectorAll('.stab');
+  if(stabs[0]) stabs[0].classList.add('active');
   openModal('modal-lancamento-dir');
 }
 
