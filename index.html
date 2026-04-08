@@ -1723,7 +1723,7 @@ async function voltarParaPrevisao(meetingId){
   // Restaura os blocos de casas com os itens aprovados
   blocks = JSON.parse(JSON.stringify(m.casas || []));
 
-  // Salva como rascunho (previsão) no Firestore
+  // Salva como rascunho (previsão) no Firestore e REMOVE da coleção meetings
   const draftData = {
     data: m.data,
     ofertas: m.ofertas||0, piedade: m.piedade||0, custos: m.custos||0,
@@ -1735,10 +1735,14 @@ async function voltarParaPrevisao(meetingId){
   setSyncing();
   try {
     await window._fb.setDoc(window._fb.doc(window._db,'draft','current'), draftData);
+    await window._fb.deleteDoc(window._fb.doc(window._db,'meetings', meetingId));
+    // Remove da lista local para sumir imediatamente da Ata
+    meetings = meetings.filter(x => (x._docId || x.id) !== meetingId);
     setSynced();
-  } catch(e){ setSyncErr(); console.warn('Erro ao salvar rascunho:', e.message); }
+  } catch(e){ setSyncErr(); console.warn('Erro ao reverter reunião:', e.message); }
 
   // Navega para a aba Pauta da Reunião e renderiza
+  renderHistorico(); // atualiza a Ata para remover a linha imediatamente
   showPage('reuniao');
   updateMeetingHeader();
   recalcSaldo();
