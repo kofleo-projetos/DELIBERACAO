@@ -515,8 +515,8 @@ tbody tr:hover td{background:#f7f9ff;}
   <div class="section" style="margin-top:26px">
     <div class="sec-title">Resumo por Reunião</div>
     <div class="table-wrap">
-      <table><thead><tr><th>Data</th><th>Total Ofertas</th><th>Disponível</th><th>Itens</th><th>Total Previsto</th><th>Total Aprovado</th><th>Transf. Piedade</th><th>Reserva Terreno</th><th>Coletas Especiais</th><th>Outros Valores</th></tr></thead>
-      <tbody id="h-summary"><tr class="empty-row"><td colspan="10">Sem dados</td></tr></tbody></table>
+      <table><thead><tr><th>Data</th><th>Total Ofertas</th><th>Disponível</th><th>Itens</th><th>Total Previsto</th><th>Total Aprovado</th><th>Transf. Piedade</th><th>Reserva Terreno</th><th>Coletas Especiais</th><th>Outros Valores</th><th>Ações</th></tr></thead>
+      <tbody id="h-summary"><tr class="empty-row"><td colspan="11">Sem dados</td></tr></tbody></table>
     </div>
   </div>
 </div>
@@ -658,21 +658,9 @@ tbody tr:hover td{background:#f7f9ff;}
     <div class="chart-inner"><canvas id="ch-casas"></canvas></div>
   </div>
 
-  <div class="section">
-    <div class="sec-title">Resumo — Ofertas Direcionadas</div>
-    <div class="table-wrap" style="margin-bottom:20px">
-      <table><thead><tr><th>Descrição</th><th>Casa de Oração</th><th>Lançamentos / Datas</th><th>Total</th></tr></thead>
-      <tbody id="dash-dir-table"><tr class="empty-row"><td colspan="4">Nenhuma oferta direcionada registrada</td></tr></tbody></table>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="sec-title">Últimas Deliberações</div>
-    <div class="table-wrap">
-      <table><thead><tr><th>Data</th><th>Descrição</th><th>Tipo</th><th>Casa de Oração</th><th>Previsto</th><th>Aprovado</th></tr></thead>
-      <tbody id="dash-table"><tr class="empty-row"><td colspan="6">Nenhum registro ainda</td></tr></tbody></table>
-    </div>
-  </div>
+  <!-- elementos ocultos mantidos para evitar erros de JS -->
+  <tbody id="dash-dir-table" style="display:none"></tbody>
+  <tbody id="dash-table" style="display:none"></tbody>
 </div>
 
 <!-- ══════ MODALS ══════ -->
@@ -1682,6 +1670,7 @@ function renderHistorico(){
 
   document.getElementById('h-summary').innerHTML=meetings.length ? [...meetings].sort((a,b)=>b.data.localeCompare(a.data)).map(m=>{
     const its=(m.casas||[]).flatMap(b=>b.items);
+    const mId=m._docId||m.id;
     return `<tr>
       <td class="mono" style="font-size:12px">${m.data}</td>
       <td class="mono green">${N(m.ofertas)}</td>
@@ -1693,8 +1682,70 @@ function renderHistorico(){
       <td class="mono" style="color:#0891b2">${N(m.terreno)}</td>
       <td class="mono" style="color:#059669">${N(m.coletas||0)}</td>
       <td class="mono" style="color:#d97706">${N(m.outros||0)}${m.outrosFinalidade?` <span title="${m.outrosFinalidade}" style="cursor:help;color:var(--text3)">ℹ️</span>`:''}</td>
+      <td><button class="btn btn-warn btn-xs" onclick="voltarParaPrevisao('${mId}')" title="Carregar esta reunião como Previsão na Pauta da Reunião" style="white-space:nowrap">↩ Voltar Previsão</button></td>
     </tr>`;
-  }).join('') : '<tr class="empty-row"><td colspan="10">Sem dados</td></tr>';
+  }).join('') : '<tr class="empty-row"><td colspan="11">Sem dados</td></tr>';
+}
+
+// ══════════════════════════════════════════════════════════════
+//  VOLTAR PARA PREVISÃO
+// ══════════════════════════════════════════════════════════════
+async function voltarParaPrevisao(meetingId){
+  const m = meetings.find(x => (x._docId || x.id) === meetingId);
+  if(!m){ alert('Reunião não encontrada.'); return; }
+
+  const confirmMsg =
+    `Deseja carregar a reunião de ${m.data} como Previsão na Pauta da Reunião?\n\n` +
+    `Todos os itens aprovados serão restaurados como previsão.\n` +
+    `Os dados atuais da pauta serão substituídos.`;
+  if(!confirm(confirmMsg)) return;
+
+  // Preenche os campos financeiros da reunião
+  const setV = (id, val) => {
+    const el = document.getElementById(id);
+    if(el){ el.value = val > 0 ? N(val) : ''; }
+  };
+  document.getElementById('r-data').value = m.data;
+  setV('r-ofertas', m.ofertas || 0);
+  setV('r-piedade', m.piedade || 0);
+  setV('r-custos', m.custos || 0);
+  setV('r-terreno', m.terreno || 0);
+  setV('r-coletas', m.coletas || 0);
+  setV('r-outros', m.outros || 0);
+  window._outrosFinalidade = m.outrosFinalidade || '';
+  const dispOtros = document.getElementById('outros-finalidade-display');
+  const txtOtros  = document.getElementById('outros-finalidade-text');
+  if(dispOtros && txtOtros){
+    if(window._outrosFinalidade){ dispOtros.style.display='block'; txtOtros.textContent=window._outrosFinalidade; }
+    else { dispOtros.style.display='none'; }
+  }
+
+  // Restaura os blocos de casas com os itens aprovados
+  blocks = JSON.parse(JSON.stringify(m.casas || []));
+
+  // Salva como rascunho (previsão) no Firestore
+  const draftData = {
+    data: m.data,
+    ofertas: m.ofertas||0, piedade: m.piedade||0, custos: m.custos||0,
+    direc: m.direc||0, terreno: m.terreno||0, coletas: m.coletas||0,
+    outros: m.outros||0, outrosFinalidade: window._outrosFinalidade||'',
+    blocks: JSON.parse(JSON.stringify(blocks)),
+    savedAt: new Date().toISOString()
+  };
+  setSyncing();
+  try {
+    await window._fb.setDoc(window._fb.doc(window._db,'draft','current'), draftData);
+    setSynced();
+  } catch(e){ setSyncErr(); console.warn('Erro ao salvar rascunho:', e.message); }
+
+  // Navega para a aba Pauta da Reunião e renderiza
+  showPage('reuniao');
+  updateMeetingHeader();
+  recalcSaldo();
+  renderBlocks();
+  autoFillDirec();
+  showDraftBanner(m.data);
+  notify('Reunião restaurada como Previsão!');
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1712,81 +1763,128 @@ function exportPDF(){
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
   const W=doc.internal.pageSize.getWidth();
-  let y=18;
+  const H=doc.internal.pageSize.getHeight();
+  const ML=14, MR=14, CW=W-ML-MR;
+
+  // ── helpers ──
+  const checkPage=(doc,y,needed)=>{ if(y+needed>H-16){ doc.addPage(); return 20; } return y; };
+  const drawPageNum=d=>{ const pg=d.internal.getCurrentPageInfo().pageNumber; d.setFontSize(7.5); d.setTextColor(170,175,185); d.setFont('helvetica','normal'); d.text(`Página ${pg}`,W/2,H-7,{align:'center'}); };
 
   filtered.forEach((m,mi)=>{
-    if(mi>0){ doc.addPage(); y=18; }
+    if(mi>0){ doc.addPage(); }
     const [yr,mo,dd]=m.data.split('-');
-    doc.setFillColor(245,246,250);
-    doc.rect(0,0,W,36,'F');
-    doc.setDrawColor(210,215,225);
-    doc.line(0,36,W,36);
-    doc.setTextColor(30,40,60);
-    doc.setFontSize(11); doc.setFont('helvetica','bold');
+
+    // ── Cabeçalho ──
+    doc.setFillColor(30,110,244);
+    doc.rect(0,0,W,30,'F');
+    doc.setTextColor(255,255,255);
+    doc.setFontSize(12); doc.setFont('helvetica','bold');
     doc.text('CONGREGAÇÃO CRISTÃ NO BRASIL',W/2,10,{align:'center'});
-    doc.setFontSize(9); doc.setFont('helvetica','normal');
-    doc.setTextColor(80,90,110);
+    doc.setFontSize(8.5); doc.setFont('helvetica','normal');
     doc.text('ADMINISTRAÇÃO CAIEIRAS — DELIBERAÇÕES PARA O MÊS',W/2,17,{align:'center'});
     doc.text(`REUNIÃO MENSAL DA ADMINISTRAÇÃO DE CAIEIRAS E MINISTÉRIO — REALIZADA EM ${dd}/${mo}/${yr}`,W/2,23,{align:'center'});
-    doc.setFontSize(9); doc.setFont('helvetica','bold');
-    doc.setTextColor(60,70,90);
-    doc.text('MOVIMENTO FINANCEIRO',14,32);
-    y=44;
 
-    const manItems=(m.casas||[]).flatMap(b=>b.items.filter(i=>i.tipo==='manutencao').map(i=>({...i,casa:b.casa})));
-    if(manItems.length){
-      doc.setFillColor(240,240,245);
-      doc.rect(14,y-4,W-28,7,'F');
-      doc.setDrawColor(200,200,210);
-      doc.rect(14,y-4,W-28,7,'D');
-      doc.setTextColor(50,50,70); doc.setFontSize(9); doc.setFont('helvetica','bold');
-      doc.text('MANUTENÇÃO',W/2,y+0.5,{align:'center'});
-      y+=7;
-      doc.autoTable({
-        startY:y, margin:{left:14,right:14},
-        head:[['Casa de Oração','Descrição','Solicitante','Previsto (R$)','Aprovado (R$)']],
-        body:manItems.map(i=>[i.casa,i.desc,i.solicitante||'—',N(i.previsto),N(i.aprovado)]),
-        foot:[['','','TOTAL',N(manItems.reduce((a,i)=>a+i.previsto,0)),N(manItems.reduce((a,i)=>a+i.aprovado,0))]],
-        headStyles:{fillColor:[230,230,238],textColor:[40,40,60],fontSize:8,fontStyle:'bold'},
-        footStyles:{fillColor:[240,240,245],textColor:[40,40,60],fontStyle:'bold',fontSize:8},
-        bodyStyles:{fontSize:8,textColor:[40,40,40]},
-        alternateRowStyles:{fillColor:[248,248,252]},
-        columnStyles:{0:{cellWidth:36},3:{halign:'right'},4:{halign:'right',fontStyle:'bold'}},
-        tableLineColor:[200,205,215],tableLineWidth:.3,
-        theme:'grid'
+    // ── Totais gerais ──
+    const allItems=(m.casas||[]).flatMap(b=>b.items);
+    const totAprov=allItems.reduce((a,i)=>a+i.aprovado,0);
+    const totMan  =allItems.filter(i=>i.tipo==='manutencao').reduce((a,i)=>a+i.aprovado,0);
+    const totCon  =allItems.filter(i=>i.tipo==='construcao').reduce((a,i)=>a+i.aprovado,0);
+
+    // ── 3 cartões de totais ──
+    let y=36;
+    const cardW=(CW-8)/3;
+    const cards=[
+      {label:'TOTAL APROVADO',value:totAprov,r:22,g:100,b:80},
+      {label:'MANUTENÇÃO',    value:totMan,  r:80, g:40,b:160},
+      {label:'CONSTRUÇÃO',    value:totCon,  r:180,g:100,b:10}
+    ];
+    cards.forEach((c,ci)=>{
+      const cx=ML+ci*(cardW+4);
+      doc.setFillColor(c.r,c.g,c.b);
+      doc.roundedRect(cx,y,cardW,14,2,2,'F');
+      doc.setTextColor(255,255,255);
+      doc.setFontSize(7); doc.setFont('helvetica','bold');
+      doc.text(c.label,cx+cardW/2,y+5,{align:'center'});
+      doc.setFontSize(9.5); doc.setFont('helvetica','bold');
+      doc.text('R$ '+c.value.toLocaleString('pt-BR',{minimumFractionDigits:2}),cx+cardW/2,y+11,{align:'center'});
+    });
+    y+=20;
+
+    // ── Por cada tipo: agrupa por casa de oração ──
+    const tipos=[
+      {key:'manutencao', label:'MANUTENÇÃO', hFill:[220,215,245], hText:[40,20,100], fFill:[235,230,250], lineColor:[190,185,220]},
+      {key:'construcao',  label:'CONSTRUÇÃO',  hFill:[245,240,215], hText:[60,40,10],  fFill:[250,245,225], lineColor:[210,200,170]}
+    ];
+
+    tipos.forEach(tipo=>{
+      const casasDoTipo=(m.casas||[]).filter(b=>b.items.some(i=>i.tipo===tipo.key));
+      if(!casasDoTipo.length) return;
+
+      // Cabeçalho do tipo
+      y=checkPage(doc,y,12);
+      doc.setFillColor(...tipo.hFill);
+      doc.rect(ML,y,CW,7,'F');
+      doc.setDrawColor(...tipo.lineColor);
+      doc.rect(ML,y,CW,7,'D');
+      doc.setTextColor(...tipo.hText);
+      doc.setFontSize(9); doc.setFont('helvetica','bold');
+      doc.text(tipo.label,W/2,y+5,{align:'center'});
+      y+=9;
+
+      const tipoTotal=casasDoTipo.reduce((s,b)=>s+b.items.filter(i=>i.tipo===tipo.key).reduce((a,i)=>a+i.aprovado,0),0);
+
+      casasDoTipo.forEach(b=>{
+        const items=b.items.filter(i=>i.tipo===tipo.key);
+        if(!items.length) return;
+        const casaTotal=items.reduce((a,i)=>a+i.aprovado,0);
+        const pct=tipoTotal>0?((casaTotal/tipoTotal)*100).toFixed(1):'0.0';
+
+        y=checkPage(doc,y,10+items.length*6);
+
+        // Faixa do nome da casa
+        doc.setFillColor(240,243,252);
+        doc.rect(ML,y,CW,7,'F');
+        doc.setDrawColor(200,208,230);
+        doc.rect(ML,y,CW,7,'D');
+        doc.setTextColor(20,50,120); doc.setFontSize(8); doc.setFont('helvetica','bold');
+        doc.text(b.casa.toUpperCase(),ML+3,y+5);
+        // % à direita
+        doc.setTextColor(80,100,180); doc.setFontSize(7.5); doc.setFont('helvetica','bold');
+        doc.text(`${pct}% do total`,W-MR-2,y+5,{align:'right'});
+        y+=8;
+
+        // Itens da casa
+        doc.autoTable({
+          startY:y, margin:{left:ML,right:MR},
+          head:[['Descrição','Solicitante','Aprovado (R$)']],
+          body:items.map(i=>[i.desc, i.solicitante||'—', 'R$ '+i.aprovado.toLocaleString('pt-BR',{minimumFractionDigits:2})]),
+          foot:[['','TOTAL CASA','R$ '+casaTotal.toLocaleString('pt-BR',{minimumFractionDigits:2})]],
+          headStyles:{fillColor:tipo.hFill,textColor:tipo.hText,fontSize:7.5,fontStyle:'bold'},
+          footStyles:{fillColor:tipo.fFill,textColor:tipo.hText,fontStyle:'bold',fontSize:7.5},
+          bodyStyles:{fontSize:7.5,textColor:[30,35,45]},
+          alternateRowStyles:{fillColor:[250,251,255]},
+          columnStyles:{0:{cellWidth:'auto'},1:{cellWidth:30},2:{cellWidth:32,halign:'right',fontStyle:'bold'}},
+          tableLineColor:tipo.lineColor,tableLineWidth:.25,
+          theme:'grid',
+          didDrawPage:()=>{ drawPageNum(doc); }
+        });
+        y=doc.lastAutoTable.finalY+4;
       });
-      y=doc.lastAutoTable.finalY+8;
-    }
 
-    const conItems=(m.casas||[]).flatMap(b=>b.items.filter(i=>i.tipo==='construcao').map(i=>({...i,casa:b.casa})));
-    if(conItems.length){
-      if(y>240){ doc.addPage(); y=18; }
-      doc.setFillColor(245,243,235);
-      doc.rect(14,y-4,W-28,7,'F');
-      doc.setDrawColor(210,205,185);
-      doc.rect(14,y-4,W-28,7,'D');
-      doc.setTextColor(60,50,20); doc.setFontSize(9); doc.setFont('helvetica','bold');
-      doc.text('CONSTRUÇÃO',W/2,y+0.5,{align:'center'});
-      y+=7;
-      doc.autoTable({
-        startY:y, margin:{left:14,right:14},
-        head:[['Casa de Oração','Descrição','Solicitante','Previsto (R$)','Aprovado (R$)']],
-        body:conItems.map(i=>[i.casa,i.desc,i.solicitante||'—',N(i.previsto),N(i.aprovado)]),
-        foot:[['','','TOTAL',N(conItems.reduce((a,i)=>a+i.previsto,0)),N(conItems.reduce((a,i)=>a+i.aprovado,0))]],
-        headStyles:{fillColor:[238,234,215],textColor:[50,40,20],fontSize:8,fontStyle:'bold'},
-        footStyles:{fillColor:[245,243,235],textColor:[50,40,20],fontStyle:'bold',fontSize:8},
-        bodyStyles:{fontSize:8,textColor:[40,40,40]},
-        alternateRowStyles:{fillColor:[252,250,242]},
-        columnStyles:{0:{cellWidth:36},3:{halign:'right'},4:{halign:'right',fontStyle:'bold'}},
-        tableLineColor:[210,205,185],tableLineWidth:.3,
-        theme:'grid'
-      });
-      y=doc.lastAutoTable.finalY+8;
-    }
+      // Rodapé do tipo
+      y=checkPage(doc,y,8);
+      doc.setFillColor(...tipo.fFill);
+      doc.rect(ML,y,CW,7,'F');
+      doc.setDrawColor(...tipo.lineColor);
+      doc.rect(ML,y,CW,7,'D');
+      doc.setTextColor(...tipo.hText);
+      doc.setFontSize(8); doc.setFont('helvetica','bold');
+      doc.text(`TOTAL ${tipo.label}`,ML+3,y+5);
+      doc.text('R$ '+tipoTotal.toLocaleString('pt-BR',{minimumFractionDigits:2}),W-MR-2,y+5,{align:'right'});
+      y+=10;
+    });
 
-    const pg=doc.internal.getCurrentPageInfo().pageNumber;
-    doc.setFontSize(8); doc.setTextColor(160,165,175); doc.setFont('helvetica','normal');
-    doc.text(`Página ${pg}`,W/2,doc.internal.pageSize.getHeight()-8,{align:'center'});
+    drawPageNum(doc);
   });
 
   const fname=`ata_${anoF||'todos'}_${mesF?MESES[+mesF]:'todos'}.pdf`.replace(/ /g,'_');
