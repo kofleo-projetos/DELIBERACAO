@@ -554,28 +554,6 @@ tbody tr:hover td{background:#f7f9ff;}
       </div>
     </div>
 
-    <!-- Cards de saldo -->
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px;">
-      <div class="card" style="--ca:#6366f1">
-        <div class="card-label">Saldo Mês Anterior</div>
-        <div class="curr-wrap" style="margin-top:4px">
-          <span class="curr-prefix" style="color:#6366f1">R$</span>
-          <input type="text" id="dir-saldo-anterior" class="curr-inp ii" style="width:145px;border-color:#a5b4fc;color:#4338ca;font-weight:600;" placeholder="0,00" oninput="maskCurr(this);atualizaCardsDir()">
-        </div>
-        <div class="card-sub">Editável — informe o saldo do mês anterior</div>
-      </div>
-      <div class="card" style="--ca:#0891b2">
-        <div class="card-label">Saldo Atual</div>
-        <div class="card-value" id="dir-card-atual">R$ 0,00</div>
-        <div class="card-sub" id="dir-card-atual-sub">Soma do período filtrado</div>
-      </div>
-      <div class="card" style="--ca:#16a06e">
-        <div class="card-label">Saldo Total</div>
-        <div class="card-value" id="dir-card-total">R$ 0,00</div>
-        <div class="card-sub">Mês Anterior + Atual</div>
-      </div>
-    </div>
-
     <div style="background:#eef3ff;border:1px solid #c5d6fd;border-radius:9px;padding:11px 16px;margin-bottom:14px;font-size:12px;color:#2d4a8a;display:flex;align-items:center;gap:10px;">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1e6ef4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
       <span>Para lançar uma oferta direcionada, vá à aba <strong>Provisionados</strong>, escolha o provisionado e clique em <strong>Lançar OF. Direcionada</strong>.</span>
@@ -586,8 +564,41 @@ tbody tr:hover td{background:#f7f9ff;}
   </div>
 
   <div class="stab-content" id="stab-provisionados">
+
+    <!-- ── Cabeçalho tipo planilha ── -->
+    <div style="background:linear-gradient(135deg,#1e3a5f,#1e6ef4);border-radius:11px;padding:13px 20px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;">
+      <div style="color:#fff;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;">Saldos Provisionados | Compromissos e Despesas Futuras</div>
+    </div>
+
+    <!-- ── Cards financeiros ── -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px;">
+      <div class="card" style="--ca:#6366f1">
+        <div class="card-label">Saldo Mês Anterior</div>
+        <div class="curr-wrap" style="margin-top:4px">
+          <span class="curr-prefix" style="color:#6366f1">R$</span>
+          <input type="text" id="dir-saldo-anterior" class="curr-inp ii" style="width:130px;border-color:#a5b4fc;color:#4338ca;font-weight:600;" placeholder="0,00" oninput="maskCurr(this);atualizaCardsDir()">
+        </div>
+        <div class="card-sub">Editável — informe o saldo do mês anterior</div>
+      </div>
+      <div class="card" style="--ca:#0891b2">
+        <div class="card-label">Saldo Atual (Direcionadas)</div>
+        <div class="card-value" id="dir-card-atual" style="font-size:16px">R$ 0,00</div>
+        <div class="card-sub" id="dir-card-atual-sub">Soma do período filtrado</div>
+      </div>
+      <div class="card" style="--ca:#16a06e">
+        <div class="card-label">Total Provisionado</div>
+        <div class="card-value" id="prov-card-total" style="font-size:16px">R$ 0,00</div>
+        <div class="card-sub">Soma de todos os provisionados</div>
+      </div>
+      <div class="card" style="--ca:#dc2626">
+        <div class="card-label">Saldo Disponível</div>
+        <div class="card-value" id="dir-card-total" style="font-size:16px">R$ 0,00</div>
+        <div class="card-sub">Mês Anterior + Direcionadas − Provisionado</div>
+      </div>
+    </div>
+
     <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
-      <button class="btn btn-primary btn-sm" onclick="openModal('modal-prov')">Novo Provisionado</button>
+      <button class="btn btn-primary btn-sm" onclick="openModal('modal-prov')">+ Novo Provisionado</button>
     </div>
     <div id="prov-list">
       <div class="empty-row" style="text-align:center;color:var(--text3);padding:40px;background:var(--surface);border:1px solid var(--border);border-radius:9px;">Nenhum valor provisionado registrado ainda.</div>
@@ -1538,9 +1549,12 @@ function renderOfertas(){
   const saldoAtual = dirFiltradas.reduce((a,d)=>a+d.valor,0);
   const saldoAnteriorEl = document.getElementById('dir-saldo-anterior');
   const saldoAnterior = saldoAnteriorEl ? parseCurr(saldoAnteriorEl.value) : 0;
-  const saldoTotal = saldoAnterior + saldoAtual;
+  const totalProvisionado = provisionados.reduce((a,p)=>a+p.valorTotal,0);
+  const saldoDisponivel = saldoAnterior + saldoAtual - totalProvisionado;
   if(document.getElementById('dir-card-atual')) document.getElementById('dir-card-atual').textContent = R(saldoAtual);
-  if(document.getElementById('dir-card-total')) document.getElementById('dir-card-total').textContent = R(saldoTotal);
+  if(document.getElementById('prov-card-total')) document.getElementById('prov-card-total').textContent = R(totalProvisionado);
+  const disponEl = document.getElementById('dir-card-total');
+  if(disponEl){ disponEl.textContent = R(saldoDisponivel); disponEl.style.color = saldoDisponivel < 0 ? '#dc2626' : '#16a06e'; }
   const subLabel = mesF ? `${MESES[+mesF]}${anoF?' '+anoF:''}` : (anoF ? anoF : 'Todos os períodos');
   if(document.getElementById('dir-card-atual-sub')) document.getElementById('dir-card-atual-sub').textContent = subLabel;
 
