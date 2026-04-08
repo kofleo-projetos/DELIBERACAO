@@ -495,7 +495,7 @@ tbody tr:hover td{background:#f7f9ff;}
     </div>
     <div class="fg"><label>Casa de Oração</label><select id="h-casa" onchange="renderHistorico()" style="width:175px"><option value="">Todas</option></select></div>
     <div class="spacer"></div>
-    <button class="btn btn-ghost btn-sm" onclick="exportCSV()">Exportar CSV</button>
+    <button class="btn btn-ghost btn-sm" onclick="exportPDFResumo()">PDF Resumo</button>
     <button class="btn btn-primary btn-sm" onclick="exportPDF()">Exportar PDF</button>
   </div>
 
@@ -1896,7 +1896,163 @@ function exportPDF(){
 }
 
 // ══════════════════════════════════════════════════════════════
-//  CSV
+//  PDF RESUMO — por Casa de Oração (estilo tabela institucional)
+// ══════════════════════════════════════════════════════════════
+function exportPDFResumo(){
+  const anoF=document.getElementById('h-ano').value;
+  const mesF=document.getElementById('h-mes').value;
+  const filtered=meetings.filter(m=>{
+    if(anoF&&!m.data.startsWith(anoF)) return false;
+    if(mesF&&m.data.substring(5,7)!==mesF) return false;
+    return true;
+  });
+  if(!filtered.length){ alert('Nenhuma reunião para o período selecionado.'); return; }
+
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const W=doc.internal.pageSize.getWidth();
+  const H=doc.internal.pageSize.getHeight();
+  const ML=20, MR=20, CW=W-ML-MR;
+
+  const drawPageNum=d=>{
+    const pg=d.internal.getCurrentPageInfo().pageNumber;
+    d.setFontSize(7.5); d.setTextColor(170,175,185); d.setFont('helvetica','normal');
+    d.text(`Página ${pg}`,W/2,H-7,{align:'center'});
+  };
+
+  filtered.forEach((m,mi)=>{
+    if(mi>0) doc.addPage();
+    const [yr,mo,dd]=m.data.split('-');
+    const mesNome=MESES[+mo]||'';
+    const labelPeriodo=`Deliberação ${mesNome} ${yr}`;
+
+    // ── Cabeçalho azul ──
+    doc.setFillColor(15,76,129);
+    doc.rect(0,0,W,32,'F');
+    doc.setTextColor(255,255,255);
+    doc.setFontSize(12); doc.setFont('helvetica','bold');
+    doc.text('CONGREGAÇÃO CRISTÃ NO BRASIL',W/2,11,{align:'center'});
+    doc.setFontSize(8.5); doc.setFont('helvetica','normal');
+    doc.text('ADMINISTRAÇÃO CAIEIRAS — DELIBERAÇÕES PARA O MÊS',W/2,18,{align:'center'});
+    doc.text(`REUNIÃO REALIZADA EM ${dd}/${mo}/${yr}`,W/2,25,{align:'center'});
+
+    // ── Para cada tipo gera uma tabela de resumo por casa ──
+    const tipos=[
+      {key:'manutencao', label:'Para Manutenção',  hdr:[20,100,80],  alt:[235,248,242], foot:[180,225,205]},
+      {key:'construcao',  label:'Para Construção',  hdr:[140,90,10],  alt:[252,246,232], foot:[240,220,170]}
+    ];
+
+    let y=38;
+
+    tipos.forEach(tipo=>{
+      // Coleta casas com itens desse tipo
+      const casaMap={};
+      (m.casas||[]).forEach(b=>{
+        b.items.filter(i=>i.tipo===tipo.key).forEach(i=>{
+          if(!casaMap[b.casa]) casaMap[b.casa]=0;
+          casaMap[b.casa]+=i.aprovado;
+        });
+      });
+      const casaEntries=Object.entries(casaMap).filter(([,v])=>v>0);
+      if(!casaEntries.length) return;
+
+      const tipoTotal=casaEntries.reduce((s,[,v])=>s+v,0);
+
+      // Verifica espaço
+      if(y+20+casaEntries.length*8>H-20){ doc.addPage(); y=20; }
+
+      // Larguras das colunas
+      const colDesc=CW*0.62, colLabel=CW*0.14, colVal=CW*0.24;
+
+      // Cabeçalho da tabela — linha de título em azul escuro
+      doc.setFillColor(15,76,129);
+      doc.rect(ML,y,CW,8,'F');
+      doc.setTextColor(255,255,255);
+      doc.setFontSize(8.5); doc.setFont('helvetica','bold');
+      // coluna esquerda: "DESCRIÇÃO"
+      doc.text('DESCRIÇÃO',ML+colDesc/2,y+5.5,{align:'center'});
+      // coluna direita: "Valor Aprovado"
+      doc.text('Valor Aprovado',ML+colDesc+colLabel+(colVal/2),y+5.5,{align:'center'});
+      y+=8;
+
+      // Label lateral azul (célula mesclada verticalmente à esquerda)
+      const tableBodyH=casaEntries.length*7+8; // linhas + rodapé
+      doc.setFillColor(15,76,129);
+      doc.rect(ML,y,colLabel,tableBodyH,'F');
+      doc.setTextColor(255,255,255);
+      doc.setFontSize(8); doc.setFont('helvetica','bold');
+      // Texto rotacionado na célula lateral
+      const midY=y+tableBodyH/2;
+      doc.saveGraphicsState();
+      doc.setFontSize(7.5);
+      const labelLines=doc.splitTextToSize(labelPeriodo,tableBodyH-4);
+      // Imprime verticalmente (rotacionado 90°)
+      labelLines.forEach((ln,li)=>{
+        doc.text(ln, ML+colLabel/2+(li-labelLines.length/2+0.5)*4.5, midY, {angle:90,align:'center'});
+      });
+      doc.restoreGraphicsState();
+
+      // Linhas das casas
+      casaEntries.forEach(([casa,valor],ri)=>{
+        const rowY=y+ri*7;
+        // Fundo alternado
+        if(ri%2===0){
+          doc.setFillColor(...tipo.alt);
+          doc.rect(ML+colLabel,rowY,colDesc+colVal,7,'F');
+        } else {
+          doc.setFillColor(255,255,255);
+          doc.rect(ML+colLabel,rowY,colDesc+colVal,7,'F');
+        }
+        // Borda
+        doc.setDrawColor(200,210,205);
+        doc.setLineWidth(0.2);
+        doc.rect(ML+colLabel,rowY,colDesc,7,'D');
+        doc.rect(ML+colLabel+colDesc,rowY,colVal,7,'D');
+        // Texto
+        doc.setTextColor(30,40,50); doc.setFontSize(8); doc.setFont('helvetica','bold');
+        doc.text(casa,ML+colLabel+3,rowY+4.8);
+        doc.setFont('helvetica','normal');
+        doc.text('R$',ML+colLabel+colDesc+3,rowY+4.8);
+        doc.text(valor.toLocaleString('pt-BR',{minimumFractionDigits:2}),ML+colLabel+colDesc+colVal-2,rowY+4.8,{align:'right'});
+      });
+
+      // Linha de total
+      const footY=y+casaEntries.length*7;
+      doc.setFillColor(...tipo.foot);
+      doc.rect(ML+colLabel,footY,colDesc+colVal,8,'F');
+      doc.setDrawColor(150,170,160);
+      doc.rect(ML+colLabel,footY,colDesc,8,'D');
+      doc.rect(ML+colLabel+colDesc,footY,colVal,8,'D');
+      doc.setTextColor(20,60,40); doc.setFontSize(8.5); doc.setFont('helvetica','bolditalic');
+      doc.text(`Total ${tipo.label}`,ML+colLabel+3,footY+5.5);
+      doc.text('R$',ML+colLabel+colDesc+3,footY+5.5);
+      doc.text(tipoTotal.toLocaleString('pt-BR',{minimumFractionDigits:2}),ML+colLabel+colDesc+colVal-2,footY+5.5,{align:'right'});
+
+      // Borda exterior da célula lateral
+      doc.setDrawColor(10,55,100); doc.setLineWidth(0.4);
+      doc.rect(ML,y,colLabel,tableBodyH,'D');
+
+      y+=tableBodyH+10;
+    });
+
+    // ── Total Geral ──
+    const totalGeral=(m.casas||[]).flatMap(b=>b.items).reduce((s,i)=>s+i.aprovado,0);
+    if(y+10>H-16){ doc.addPage(); y=20; }
+    doc.setFillColor(15,76,129);
+    doc.rect(ML,y,CW,9,'F');
+    doc.setTextColor(255,255,255); doc.setFontSize(9); doc.setFont('helvetica','bold');
+    doc.text('TOTAL GERAL APROVADO',ML+CW*0.5,y+6,{align:'center'});
+    doc.text('R$ '+totalGeral.toLocaleString('pt-BR',{minimumFractionDigits:2}),ML+CW-2,y+6,{align:'right'});
+
+    drawPageNum(doc);
+  });
+
+  const fname=`resumo_${anoF||'todos'}_${mesF?MESES[+mesF]:'todos'}.pdf`.replace(/ /g,'_');
+  doc.save(fname); notify('PDF Resumo exportado!');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  CSV (mantido internamente, sem botão)
 // ══════════════════════════════════════════════════════════════
 function exportCSV(){
   const rows=meetings.flatMap(m=>(m.casas||[]).flatMap(b=>b.items.map(i=>
