@@ -941,15 +941,19 @@ function atualizaCardsDir(){
   renderOfertas();
 }
 
-// Auto-fill r-direc from direcionadas for the meeting month
+// Auto-fill r-direc from direcionadas for the PREVIOUS month relative to the meeting date
 function autoFillDirec(){
   const data = document.getElementById('r-data').value;
-  if(!data) { setCurr('r-direc', 0); recalcSaldo(); return; }
-  const mes = data.substring(5,7);
-  const ano = data.substring(0,4);
-  const total = direcionadas.filter(d=>d.data&&d.data.startsWith(ano)&&d.data.substring(5,7)===mes)
+  const el = document.getElementById('r-direc');
+  if(!data) { if(el) el.value = '0,00'; recalcSaldo(); return; }
+  // Calcular mês anterior
+  const dateObj = new Date(data + 'T00:00:00');
+  dateObj.setMonth(dateObj.getMonth() - 1);
+  const mesPrev = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const anoPrev = String(dateObj.getFullYear());
+  const total = direcionadas.filter(d=>d.data&&d.data.startsWith(anoPrev)&&d.data.substring(5,7)===mesPrev)
                              .reduce((a,d)=>a+d.valor,0);
-  setCurr('r-direc', total);
+  if(el) el.value = N(total);
   recalcSaldo();
 }
 
@@ -1003,6 +1007,7 @@ window._appInit = function(){
       direcionadas = snap.docs.map(d => ({ ...d.data(), _docId: d.id }));
       renderOfertas();
       autoFillDirec();
+      renderDash();
     },
     () => setSyncErr()
   );
@@ -1134,7 +1139,7 @@ async function loadDraft(){
     if(window._outrosFinalidade){ const disp=document.getElementById('outros-finalidade-display'); const txt=document.getElementById('outros-finalidade-text'); if(disp&&txt){ disp.style.display='block'; txt.textContent=window._outrosFinalidade; } }
     blocks = draft.blocks || [];
     updateMeetingHeader();
-    recalcSaldo();
+    autoFillDirec();
     renderBlocks();
     showDraftBanner(draft.data);
   } catch(e){ console.warn('Sem draft:', e); }
