@@ -554,9 +554,8 @@ tbody tr:hover td{background:#f7f9ff;}
       </div>
     </div>
 
-    <div style="background:#eef3ff;border:1px solid #c5d6fd;border-radius:9px;padding:11px 16px;margin-bottom:14px;font-size:12px;color:#2d4a8a;display:flex;align-items:center;gap:10px;">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1e6ef4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      <span>Para lançar uma oferta direcionada, vá à aba <strong>Provisionados</strong>, escolha o provisionado e clique em <strong>Lançar OF. Direcionada</strong>.</span>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:14px;gap:8px;">
+      <button class="btn btn-primary btn-sm" onclick="openNovaOfertaDirecionada()">+ Nova Oferta Direcionada</button>
     </div>
     <div id="dir-list">
       <div class="empty-row" style="text-align:center;color:var(--text3);padding:40px;background:var(--surface);border:1px solid var(--border);border-radius:9px;">Nenhuma oferta direcionada registrada ainda.</div>
@@ -786,14 +785,10 @@ tbody tr:hover td{background:#f7f9ff;}
   </div>
 </div>
 
-<!-- MODAL: Nova Oferta Direcionada (vinculada a provisionado) -->
+<!-- MODAL: Nova Oferta Direcionada (standalone) -->
 <div class="modal-overlay" id="modal-lancamento-dir">
   <div class="modal" style="width:520px">
-    <div class="modal-title">Lançar Oferta Direcionada</div>
-    <p style="font-size:12px;color:var(--text2);margin-bottom:14px">
-      Provisionado: <strong id="lancdir-prov-label">—</strong><br>
-      Informação: <strong class="mono blue" id="lancdir-saldo-label">—</strong>
-    </p>
+    <div class="modal-title">Nova Oferta Direcionada</div>
     <div class="form-row" style="flex-direction:column;gap:12px">
       <div class="fg"><label>Data do Lançamento</label><input type="date" id="lancdir-data"></div>
       <div class="fg"><label>Casa de Oração</label>
@@ -806,7 +801,7 @@ tbody tr:hover td{background:#f7f9ff;}
           <option>Vera Tereza</option><option>Outro</option>
         </select>
       </div>
-      <div class="fg"><label>Descrição</label><input type="text" id="lancdir-desc" placeholder="Descrição da oferta direcionada"></div>
+      <div class="fg"><label>Descrição</label><input type="text" id="lancdir-desc" placeholder="Ex: Oferta para reforma do telhado"></div>
       <div class="fg"><label>Valor (R$)</label><div class="curr-wrap"><span class="curr-prefix">R$</span><input type="text" id="lancdir-valor" class="curr-inp" style="width:100%" placeholder="0,00" oninput="maskCurr(this)"></div></div>
     </div>
     <div style="display:flex;gap:9px;justify-content:flex-end;margin-top:18px">
@@ -1598,8 +1593,6 @@ function renderOfertas(){
               <div class="oferta-card-value">${R(p.valorTotal)}</div>
               <div class="oferta-card-remaining">Saldo: <strong class="${saldo<0?'red':'green'}">${R(saldo)}</strong></div>
             </div>
-            <button class="btn btn-primary btn-xs" style="background:#1e40af;color:#fff;border:none" onclick="openLancamentoDirecionada('${docId}')">Lançar OF. Direcionada</button>
-            <button class="btn-rescue" onclick="openResgate('${docId}')">Resgatar</button>
             <button class="btn btn-ghost btn-xs" onclick="openEditProvisionado('${docId}')">✏️ Editar</button>
             <button class="btn btn-danger btn-xs" onclick="deleteProvisionado('${docId}')">Excluir</button>
           </div>
@@ -2177,48 +2170,52 @@ async function confirmEditProvisionado(){
 }
 
 
-let _lancDirProvId=null;
-
-function openLancamentoDirecionada(docId){
-  const p=provisionados.find(x=>x._docId===docId||x.id===docId);
-  if(!p){ alert('Provisionado não encontrado.'); return; }
-  // Direcionadas sao ENTRADA no provisionado (receita que financia a obra)
-  const dirJaLancadas=direcionadas.filter(d=>d.provisionadoId===docId).reduce((a,d)=>a+d.valor,0);
-  _lancDirProvId=docId;
-  document.getElementById('lancdir-prov-label').textContent=p.desc+' ('+p.casa+')';
-  document.getElementById('lancdir-saldo-label').textContent='Meta: '+R(p.valorTotal)+' | OF. Dir. ja lancadas: '+R(dirJaLancadas);
+function openNovaOfertaDirecionada(){
   document.getElementById('lancdir-data').value='';
   document.getElementById('lancdir-casa').value='';
   document.getElementById('lancdir-desc').value='';
   document.getElementById('lancdir-valor').value='';
-  // Mudar para a aba Direcionadas
-  document.querySelectorAll('.stab').forEach(e=>e.classList.remove('active'));
-  document.querySelectorAll('.stab-content').forEach(e=>e.classList.remove('active'));
-  document.getElementById('stab-direcionadas').classList.add('active');
-  const stabs=document.querySelectorAll('.stab');
-  if(stabs[0]) stabs[0].classList.add('active');
   openModal('modal-lancamento-dir');
 }
 
+// Resgate de oferta direcionada (abre modal de resgate com a direcionada como origem)
+function openResgateDir(docId){
+  const d=direcionadas.find(x=>x._docId===docId||x.id===docId);
+  if(!d){ alert('Oferta não encontrada.'); return; }
+  // Buscar provisionado vinculado para mostrar saldo, se houver
+  const p=d.provisionadoId?provisionados.find(x=>x._docId===d.provisionadoId||x.id===d.provisionadoId):null;
+  const saldoLabel=p?'Provisionado: '+p.desc+' — Saldo: '+R(p.valorTotal-(p.resgates||[]).reduce((a,r)=>a+r.valor,0)):'Valor lançado: '+R(d.valor);
+  resgateTargetId=d.provisionadoId||(d._docId||d.id);
+  // Se não tem provisionado vinculado, usa a própria direcionada como referência de saldo
+  if(!d.provisionadoId){
+    // resgate sem provisionado: não há resgates registrados, saldo = valor da direcionada
+    document.getElementById('resgate-desc-label').textContent=d.desc+' ('+d.casa+')';
+    document.getElementById('resgate-saldo-label').textContent=R(d.valor);
+  } else {
+    const utilizado=(p&&p.resgates||[]).reduce((a,r)=>a+r.valor,0);
+    const saldo=p?p.valorTotal-utilizado:d.valor;
+    document.getElementById('resgate-desc-label').textContent=d.desc+' ('+d.casa+')';
+    document.getElementById('resgate-saldo-label').textContent=R(saldo);
+  }
+  document.getElementById('resgate-valor').value='';
+  document.getElementById('resgate-data').value='';
+  document.getElementById('resgate-obs').value='';
+  openModal('modal-resgate');
+}
+
 async function confirmarLancamentoDirecionada(){
-  if(!_lancDirProvId){ return; }
-  const p=provisionados.find(x=>x._docId===_lancDirProvId||x.id===_lancDirProvId);
-  if(!p) return;
   const casa=document.getElementById('lancdir-casa').value;
   const desc=document.getElementById('lancdir-desc').value.trim();
   const valor=parseCurr(document.getElementById('lancdir-valor').value);
   const data=document.getElementById('lancdir-data').value;
   if(!casa||!desc||!valor||!data){ alert('Preencha todos os campos.'); return; }
-
-  // Direcionadas sao entrada — sem limite de valor
   const id='dir_'+Date.now();
   setSyncing();
   try {
-    await window._fb.setDoc(window._fb.doc(window._db,'direcionadas',id),
-      {id,data,casa,desc,valor,provisionadoId:_lancDirProvId,provisionadoDesc:p.desc});
+    await window._fb.setDoc(window._fb.doc(window._db,'direcionadas',id),{id,data,casa,desc,valor});
     setSynced();
     closeModal('modal-lancamento-dir');
-    notify('Oferta direcionada lançada! Saldo do provisionado atualizado.');
+    notify('Oferta direcionada lançada!');
   } catch(e){ setSyncErr(); alert('Erro: '+e.message); }
 }
 
@@ -2289,7 +2286,7 @@ function toggleDirGroup(id){
 
 function renderDirecionadasComSomatoria(direcionadas, provisionados){
   if(!direcionadas.length){
-    return '<div style="text-align:center;color:var(--text3);padding:36px;background:var(--surface);border:1px solid var(--border);border-radius:9px;">Nenhuma oferta direcionada lançada ainda.<br><small style="font-size:11px;margin-top:6px;display:block;">Para lançar uma oferta direcionada, abra um Provisionado na aba "Provisionados" e clique em "Lançar Oferta Direcionada".</small></div>';
+    return '<div style="text-align:center;color:var(--text3);padding:36px;background:var(--surface);border:1px solid var(--border);border-radius:9px;">Nenhuma oferta direcionada lançada ainda.<br><small style="font-size:11px;margin-top:6px;display:block;">Clique em "+ Nova Oferta Direcionada" para registrar.</small></div>';
   }
 
   // Agrupar por desc+casa
@@ -2328,6 +2325,7 @@ function renderDirecionadasComSomatoria(direcionadas, provisionados){
             <div class="oferta-card-value">${R(g.total)}</div>
             ${hasMultiple?`<div style="font-size:10px;color:var(--text3)">somatória</div>`:''}
           </div>
+          <button class="btn-rescue" onclick="openResgateDir('${itensOrdenados[0]._docId||itensOrdenados[0].id}')">Resgatar</button>
           ${hasMultiple?`<button id="dirgroupbtn-${uid}" class="btn btn-ghost btn-xs" onclick="toggleDirGroup('${uid}')">▼ Ver datas</button>`:''}
         </div>
       </div>`;
@@ -2344,6 +2342,7 @@ function renderDirecionadasComSomatoria(direcionadas, provisionados){
           </span>
           <div style="display:flex;align-items:center;gap:6px;">
             <span class="mono blue">${R(d.valor)}</span>
+            <button class="btn-rescue" onclick="openResgateDir('${d._docId||d.id}')">Resgatar</button>
             <button class="btn btn-ghost btn-xs" onclick="openEditDirecionada('${d._docId||d.id}')">✏️ Editar</button>
             <button class="btn btn-danger btn-xs" onclick="deleteDirecionada('${d._docId||d.id}')">Excluir</button>
           </div>
@@ -2356,6 +2355,7 @@ function renderDirecionadasComSomatoria(direcionadas, provisionados){
       html+=`<div style="margin-top:6px;display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--text2);">
         <span class="mono">${d.data}</span>
         <div style="display:flex;gap:6px;">
+          <button class="btn-rescue" onclick="openResgateDir('${d._docId||d.id}')">Resgatar</button>
           <button class="btn btn-ghost btn-xs" onclick="openEditDirecionada('${d._docId||d.id}')">✏️ Editar</button>
           <button class="btn btn-danger btn-xs" onclick="deleteDirecionada('${d._docId||d.id}')">Excluir</button>
         </div>
