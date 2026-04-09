@@ -792,7 +792,7 @@ tbody tr:hover td{background:#f7f9ff;}
     <div class="modal-title">Lançar Oferta Direcionada</div>
     <p style="font-size:12px;color:var(--text2);margin-bottom:14px">
       Provisionado: <strong id="lancdir-prov-label">—</strong><br>
-      Saldo disponível: <strong class="mono green" id="lancdir-saldo-label">—</strong>
+      Informação: <strong class="mono blue" id="lancdir-saldo-label">—</strong>
     </p>
     <div class="form-row" style="flex-direction:column;gap:12px">
       <div class="fg"><label>Data do Lançamento</label><input type="date" id="lancdir-data"></div>
@@ -1537,7 +1537,14 @@ function renderOfertas(){
   const saldoAtual = dirFiltradas.reduce((a,d)=>a+d.valor,0);
   const saldoAnteriorEl = document.getElementById('dir-saldo-anterior');
   const saldoAnterior = saldoAnteriorEl ? parseCurr(saldoAnteriorEl.value) : 0;
+  // Total provisionado = soma de todos os valorTotal dos provisionados
   const totalProvisionado = provisionados.reduce((a,p)=>a+p.valorTotal,0);
+  // Direcionadas sem vinculo a provisionado = disponivel livre
+  const dirSemVinculo = direcionadas.reduce((a,d)=>d.provisionadoId?a:a+d.valor,0);
+  // Total captado via OF. Dir. vinculadas aos provisionados
+  const dirVinculadas = direcionadas.reduce((a,d)=>d.provisionadoId?a+d.valor:a,0);
+  // Saldo disponivel = Mes Anterior + Direcionadas livres - Provisionados nao cobertos por OF. Dir.
+  // Simplificado: saldo anterior + todas direcionadas - total provisionado
   const saldoDisponivel = saldoAnterior + saldoAtual - totalProvisionado;
   if(document.getElementById('dir-card-atual')) document.getElementById('dir-card-atual').textContent = R(saldoAtual);
   if(document.getElementById('prov-card-total')) document.getElementById('prov-card-total').textContent = R(totalProvisionado);
@@ -1556,22 +1563,23 @@ function renderOfertas(){
     pl.innerHTML='<div style="text-align:center;color:var(--text3);padding:36px;background:var(--surface);border:1px solid var(--border);border-radius:9px;">Nenhum valor provisionado registrado ainda.</div>';
   } else {
     pl.innerHTML=provisionados.map(p=>{
-      const utilizado=(p.resgates||[]).reduce((a,r)=>a+r.valor,0);
+      // Direcionadas sao ENTRADA (receita que financia a obra), resgates sao SAIDA (despesa)
       const dirLigadas=direcionadas.filter(d=>d.provisionadoId===(p._docId||p.id)).reduce((a,d)=>a+d.valor,0);
-      const totalUsado=utilizado+dirLigadas;
-      const saldo=p.valorTotal-totalUsado;
-      const pct=p.valorTotal>0?Math.round(totalUsado/p.valorTotal*100):0;
+      const resgateGasto=(p.resgates||[]).reduce((a,r)=>a+r.valor,0);
+      const totalCaptado=p.valorTotal+dirLigadas;
+      const saldo=totalCaptado-resgateGasto;
+      const pct=totalCaptado>0?Math.round(resgateGasto/totalCaptado*100):0;
       const resgateRows=(p.resgates||[]).length ? (p.resgates||[]).map(r=>`
         <div class="resgate-item">
           <span>${r.data} — ${r.obs||'Resgate'}</span>
           <span class="mono red">− ${R(r.valor)}</span>
         </div>`).join('') : '';
       const dirRows=direcionadas.filter(d=>d.provisionadoId===(p._docId||p.id)).map(d=>`
-        <div class="resgate-item" style="color:#1e40af">
-          <span style="display:flex;align-items:center;gap:5px;"><span style="background:#dbeafe;color:#1e40af;border-radius:3px;font-size:10px;padding:0 5px;font-weight:600;">DIR</span>${d.data} — ${d.desc} (${d.casa})</span>
-          <span class="mono" style="color:#1e40af">− ${R(d.valor)}</span>
+        <div class="resgate-item" style="color:#166534">
+          <span style="display:flex;align-items:center;gap:5px;"><span style="background:#dcfce7;color:#166534;border-radius:3px;font-size:10px;padding:0 5px;font-weight:600;">DIR</span>${d.data} — ${d.desc} (${d.casa})</span>
+          <span class="mono" style="color:#166534">+ ${R(d.valor)}</span>
         </div>`).join('');
-      const allRows=(resgateRows+dirRows)||'<div class="resgate-item muted">Nenhum lançamento realizado</div>';
+      const allRows=(dirRows+resgateRows)||'<div class="resgate-item muted">Nenhum lançamento realizado</div>';
       const docId = p._docId||p.id;
       return `
       <div class="oferta-card">
@@ -1594,10 +1602,10 @@ function renderOfertas(){
         <div style="height:6px;background:#e5e7eb;border-radius:3px;margin:8px 0 6px;">
           <div style="height:6px;background:${pct>=100?'#dc2626':'#16a06e'};border-radius:3px;width:${Math.min(pct,100)}%"></div>
         </div>
-        <div style="font-size:11px;color:var(--text2);margin-bottom:6px;display:flex;gap:16px;">
-          <span>Total utilizado: <strong class="mono">${R(totalUsado)}</strong> (${pct}%)</span>
-          ${dirLigadas>0?`<span style="color:#1e40af;">OF. Direcionadas: <strong class="mono">${R(dirLigadas)}</strong></span>`:''}
-          ${utilizado>0?`<span style="color:#dc2626;">Resgates: <strong class="mono">${R(utilizado)}</strong></span>`:''}
+        <div style="font-size:11px;color:var(--text2);margin-bottom:6px;display:flex;gap:16px;flex-wrap:wrap;">
+          <span>Total captado: <strong class="mono">${R(totalCaptado)}</strong></span>
+          ${dirLigadas>0?`<span style="color:#166534;">+ OF. Direcionadas: <strong class="mono">${R(dirLigadas)}</strong></span>`:''}
+          ${resgateGasto>0?`<span style="color:#dc2626;">Resgates gastos: <strong class="mono">${R(resgateGasto)}</strong> (${pct}%)</span>`:''}
         </div>
         <div class="resgate-list">${allRows}</div>
       </div>`;
@@ -2169,14 +2177,11 @@ let _lancDirProvId=null;
 function openLancamentoDirecionada(docId){
   const p=provisionados.find(x=>x._docId===docId||x.id===docId);
   if(!p){ alert('Provisionado não encontrado.'); return; }
-  const utilizado=(p.resgates||[]).reduce((a,r)=>a+r.valor,0);
-  // Also count direcionadas already linked to this provisionado
-  const dirLigadas=direcionadas.filter(d=>d.provisionadoId===docId).reduce((a,d)=>a+d.valor,0);
-  const saldo=p.valorTotal-utilizado-dirLigadas;
-  if(saldo<=0){ alert('Saldo insuficiente para lançar oferta direcionada neste provisionado.'); return; }
+  // Direcionadas sao ENTRADA no provisionado (receita que financia a obra)
+  const dirJaLancadas=direcionadas.filter(d=>d.provisionadoId===docId).reduce((a,d)=>a+d.valor,0);
   _lancDirProvId=docId;
   document.getElementById('lancdir-prov-label').textContent=p.desc+' ('+p.casa+')';
-  document.getElementById('lancdir-saldo-label').textContent=R(saldo);
+  document.getElementById('lancdir-saldo-label').textContent='Meta: '+R(p.valorTotal)+' | OF. Dir. ja lancadas: '+R(dirJaLancadas);
   document.getElementById('lancdir-data').value='';
   document.getElementById('lancdir-casa').value='';
   document.getElementById('lancdir-desc').value='';
@@ -2200,11 +2205,7 @@ async function confirmarLancamentoDirecionada(){
   const data=document.getElementById('lancdir-data').value;
   if(!casa||!desc||!valor||!data){ alert('Preencha todos os campos.'); return; }
 
-  const utilizado=(p.resgates||[]).reduce((a,r)=>a+r.valor,0);
-  const dirLigadas=direcionadas.filter(d=>d.provisionadoId===_lancDirProvId).reduce((a,d)=>a+d.valor,0);
-  const saldo=p.valorTotal-utilizado-dirLigadas;
-  if(valor>saldo){ alert('Valor excede o saldo disponível ('+R(saldo)+').'); return; }
-
+  // Direcionadas sao entrada — sem limite de valor
   const id='dir_'+Date.now();
   setSyncing();
   try {
@@ -2441,10 +2442,12 @@ function renderDash(){
   // Novos cards: Ofertas Direcionadas, Provisionados e Coletas
   const tDir=direcionadas.reduce((a,d)=>a+d.valor,0);
   const tProvTotal=provisionados.reduce((a,p)=>a+p.valorTotal,0);
+  // Direcionadas sao ENTRADA nos provisionados — o saldo disponivel = captado - resgates
+  const tDirVinculadas=direcionadas.reduce((a,d)=>d.provisionadoId?a+d.valor:a,0);
   const tProvUsado=provisionados.reduce((a,p)=>{
+    // so resgates sao saida; direcionadas vinculadas sao entrada (aumentam o total disponivel)
     const res=(p.resgates||[]).reduce((s,r)=>s+r.valor,0);
-    const dl=direcionadas.filter(d=>d.provisionadoId===(p._docId||p.id)).reduce((s,d)=>s+d.valor,0);
-    return a+res+dl;
+    return a+res;
   },0);
   const tProvSaldo=tProvTotal-tProvUsado;
   const tColetas=mFiltered.reduce((a,m)=>a+(m.coletas||0),0);
