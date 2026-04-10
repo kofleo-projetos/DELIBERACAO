@@ -11,7 +11,7 @@
 <!-- Firebase SDK -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getFirestore, collection, doc, setDoc, getDoc, getDocs, deleteDoc, onSnapshot, query, orderBy }
+  import { getFirestore, collection, doc, setDoc, getDoc, getDocs, deleteDoc, onSnapshot, query, orderBy, arrayUnion }
     from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -29,7 +29,7 @@
   // ── Expose to global scope ──
   window._db = db;
   window._fb = {
-    collection, doc, setDoc, getDoc, getDocs, deleteDoc, onSnapshot, query, orderBy
+    collection, doc, setDoc, getDoc, getDocs, deleteDoc, onSnapshot, query, orderBy, arrayUnion
   };
 
   // ── Inicia o app diretamente, sem autenticação ──
@@ -372,9 +372,13 @@ tbody tr:hover td{background:#f7f9ff;}
         <div class="curr-wrap"><span class="curr-prefix" style="color:#1e40af">R$</span><input type="text" id="r-direc" class="curr-inp" style="width:160px;background:#eff6ff;border-color:#93c5fd;color:#1e40af;font-weight:600;" placeholder="0,00" readonly tabindex="-1"></div>
         <div style="font-size:10px;color:var(--text3);margin-top:2px;">Da aba Ofertas Direcionadas</div>
       </div>
-      <div class="fg">
-        <label>Construção e Terreno (R$)</label>
+      <div class="fg" title="Valor reservado para compra de terreno — será registrado automaticamente no Provisionado de Terreno ao aprovar">
+        <label style="display:flex;align-items:center;gap:5px;">
+          Construção e Terreno (R$)
+          <span style="background:#fef3c7;color:#b45309;border:1px solid #fcd34d;border-radius:4px;font-size:10px;padding:1px 6px;font-weight:600;">PROV</span>
+        </label>
         <div class="curr-wrap"><span class="curr-prefix">R$</span><input type="text" id="r-terreno" class="curr-inp" style="width:160px" placeholder="0,00" oninput="maskCurr(this)" onchange="recalcSaldo()"></div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px;">Vai para Provisionado Terreno</div>
       </div>
       <div class="fg">
         <label>Coletas Especiais (R$)</label>
@@ -596,7 +600,8 @@ tbody tr:hover td{background:#f7f9ff;}
       </div>
     </div>
 
-    <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:14px;gap:8px">
+      <button class="btn btn-ghost btn-sm" onclick="migrarAportesTerreno()" title="Lê todas as reuniões aprovadas e registra os aportes de Construção/Terreno no provisionado correspondente">🔄 Sincronizar Aportes de Terreno</button>
       <button class="btn btn-primary btn-sm" onclick="openModal('modal-prov')">+ Novo Provisionado</button>
     </div>
     <div id="prov-list">
@@ -927,6 +932,22 @@ tbody tr:hover td{background:#f7f9ff;}
   </div>
 </div>
 
+<!-- MODAL: Editar Aporte de Terreno -->
+<div class="modal-overlay" id="modal-edit-aporte">
+  <div class="modal" style="width:420px">
+    <div class="modal-title">Editar Aporte — Compra de Terreno</div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Corrija o valor ou a data deste aporte mensal.</p>
+    <div class="form-row" style="flex-direction:column;gap:12px">
+      <div class="fg"><label>Data da Reunião</label><input type="date" id="edit-aporte-data"></div>
+      <div class="fg"><label>Valor (R$)</label><div class="curr-wrap"><span class="curr-prefix">R$</span><input type="text" id="edit-aporte-valor" class="curr-inp" style="width:100%" placeholder="0,00" oninput="maskCurr(this)"></div></div>
+    </div>
+    <div style="display:flex;gap:9px;justify-content:flex-end;margin-top:18px">
+      <button class="btn btn-ghost" onclick="closeModal('modal-edit-aporte')">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmEditAporte()">Salvar</button>
+    </div>
+  </div>
+</div>
+
 </div><!-- /app-root -->
 <footer class="app-footer">Sistema desenvolvido por <strong>Leandro Machado</strong> &nbsp;·&nbsp; CCB Caieiras — Deliberações</footer>
 
@@ -990,6 +1011,7 @@ window._appInit = function(){
       meetings = snap.docs.map(d => ({ ...d.data(), _docId: d.id }));
       renderHistorico();
       renderDash();
+      migrarAportesTerreno(true);
     },
     () => setSyncErr()
   );
@@ -1015,6 +1037,7 @@ window._appInit = function(){
       provisionados = snap.docs.map(d => ({ ...d.data(), _docId: d.id }));
       renderOfertas();
       recalcSaldo();
+      migrarAportesTerreno(true);
     },
     () => setSyncErr()
   );
@@ -1387,6 +1410,33 @@ async function confirmSave(){
     await window._fb.setDoc(window._fb.doc(window._db,'meetings', id), meeting);
     // delete draft
     await window._fb.deleteDoc(window._fb.doc(window._db,'draft','current')).catch(()=>{});
+
+    // ── Auto-provisionar Terreno ──────────────────────────────
+    if(te > 0){
+      // Procura provisionado de terreno existente por palavras-chave no desc
+      // Sempre usa ID fixo — sem busca por keyword
+      const provRef = window._fb.doc(window._db, 'provisionados', TERRENO_ID);
+      const provSnap = await window._fb.getDoc(provRef);
+      if(provSnap.exists()){
+        const atual = provSnap.data();
+        const histAtual = atual.historico||[];
+        const jaExiste = histAtual.some(h=>h.meetingId===id);
+        if(!jaExiste){
+          await window._fb.setDoc(provRef,{
+            valorTotal:(atual.valorTotal||0)+te,
+            historico:window._fb.arrayUnion({meetingId:id,data,valor:te})
+          },{merge:true});
+        }
+      } else {
+        await window._fb.setDoc(provRef,{
+          id:TERRENO_ID, data, casa:'Administração',
+          desc:'Compra de Terreno', valorTotal:te, resgates:[],
+          historico:[{meetingId:id,data,valor:te}]
+        });
+      }
+    }
+    // ─────────────────────────────────────────────────────────
+
     setSynced();
   } catch(e){ setSyncErr(); alert('Erro ao salvar: '+e.message); return; }
 
@@ -1510,6 +1560,62 @@ async function deleteProvisionado(docId){
 }
 
 // ══════════════════════════════════════════════════════════════
+//  MIGRAÇÃO RETROATIVA: popula historico do provisionado de terreno
+//  com base em todas as reuniões aprovadas que tiveram terreno > 0
+// ══════════════════════════════════════════════════════════════
+const TERRENO_ID = 'prov_terreno_fixo';
+
+async function migrarAportesTerreno(silencioso=false){
+  if(!silencioso && !confirm('Isto irá ler todas as reuniões aprovadas e registrar os aportes no provisionado Compra de Terreno.\n\nContinuar?')) return;
+
+  const db = window._db;
+  const { collection, getDocs, doc, getDoc, setDoc } = window._fb;
+
+  try {
+    const [meetSnap, provSnap] = await Promise.all([
+      getDocs(collection(db, 'meetings')),
+      getDoc(doc(db, 'provisionados', TERRENO_ID))
+    ]);
+
+    const allMeetings = meetSnap.docs.map(d => ({ ...d.data(), _docId: d.id }));
+
+    // Se o provisionado fixo não existe ainda, cria
+    if(!provSnap.exists()){
+      const comTerreno = allMeetings.filter(m=>(m.terreno||0)>0).sort((a,b)=>a.data.localeCompare(b.data));
+      if(!comTerreno.length) return;
+      const historicoCompleto = comTerreno.map(m=>({meetingId:m._docId||m.id,data:m.data,valor:m.terreno}));
+      const totalAcumulado = historicoCompleto.reduce((s,h)=>s+h.valor,0);
+      await setDoc(doc(db,'provisionados',TERRENO_ID),{
+        id:TERRENO_ID, data:comTerreno[0].data, casa:'Administração',
+        desc:'Compra de Terreno', valorTotal:totalAcumulado, resgates:[], historico:historicoCompleto
+      });
+      if(!silencioso) notify(`Criado! ${historicoCompleto.length} aporte(s) — Total: ${R(totalAcumulado)}`);
+      return;
+    }
+
+    // Já existe: reconstrói histórico a partir das reuniões
+    const comTerreno = allMeetings.filter(m=>(m.terreno||0)>0).sort((a,b)=>a.data.localeCompare(b.data));
+    if(!comTerreno.length) return;
+    const historicoCompleto = comTerreno.map(m=>({meetingId:m._docId||m.id,data:m.data,valor:m.terreno}));
+    const totalAcumulado = historicoCompleto.reduce((s,h)=>s+h.valor,0);
+
+    const atual = provSnap.data();
+    const histAtual = atual.historico||[];
+    const jaSync = histAtual.length===historicoCompleto.length
+      && historicoCompleto.every(h=>histAtual.some(ha=>ha.meetingId===h.meetingId&&ha.valor===h.valor));
+    if(jaSync) return;
+
+    await setDoc(doc(db,'provisionados',TERRENO_ID),
+      {valorTotal:totalAcumulado, historico:historicoCompleto},{merge:true});
+    if(!silencioso) notify(`Sincronizado! ${historicoCompleto.length} aporte(s) — Total: ${R(totalAcumulado)}`);
+
+  } catch(e){
+    if(!silencioso) console.error('migrarAportesTerreno:', e);
+    else alert('Erro: '+e.message);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RENDER OFERTAS
 // ══════════════════════════════════════════════════════════════
 function renderOfertas(){
@@ -1579,7 +1685,22 @@ function renderOfertas(){
           <span style="display:flex;align-items:center;gap:5px;"><span style="background:#dcfce7;color:#166534;border-radius:3px;font-size:10px;padding:0 5px;font-weight:600;">DIR</span>${d.data} — ${d.desc} (${d.casa})</span>
           <span class="mono" style="color:#166534">+ ${R(d.valor)}</span>
         </div>`).join('');
-      const allRows=(dirRows+resgateRows)||'<div class="resgate-item muted">Nenhum lançamento realizado</div>';
+      // Historico de aportes mensais — só exibe no provisionado fixo de terreno
+      const isTerreno = (p._docId||p.id) === TERRENO_ID;
+      const historicoRows = isTerreno && (p.historico||[]).length ? `
+        <div style="margin-bottom:4px;font-size:10px;font-weight:600;color:#b45309;text-transform:uppercase;letter-spacing:.06em;">Aportes Mensais</div>
+        `+(p.historico||[]).sort((a,b)=>a.data.localeCompare(b.data)).map((h,hi)=>`
+        <div class="resgate-item" style="color:#b45309">
+          <span style="display:flex;align-items:center;gap:6px;">
+            <span style="background:#fef3c7;color:#b45309;border-radius:3px;font-size:10px;padding:0 5px;font-weight:600;">APORTE</span>
+            <span class="mono" style="font-size:11px">${h.data}</span>
+          </span>
+          <span style="display:flex;align-items:center;gap:6px;">
+            <span class="mono" style="color:#b45309;font-weight:600">+ ${R(h.valor)}</span>
+            <button class="btn btn-ghost btn-xs" onclick="openEditAporte(${hi})">✏️ Editar</button>
+          </span>
+        </div>`).join('') : '';
+      const allRows=(historicoRows+dirRows+resgateRows)||'<div class="resgate-item muted">Nenhum lançamento realizado</div>';
       const docId = p._docId||p.id;
       return `
       <div class="oferta-card">
@@ -2415,6 +2536,46 @@ async function confirmEditDirecionada(){
 }
 
 // ══════════════════════════════════════════════════════════════
+//  EDITAR APORTE DE TERRENO
+// ══════════════════════════════════════════════════════════════
+let _editAporteIdx = -1;
+
+function openEditAporte(idx){
+  const p = provisionados.find(p=>(p._docId||p.id)===TERRENO_ID);
+  if(!p){ alert('Provisionado de terreno não encontrado.'); return; }
+  const h = (p.historico||[])[idx];
+  if(!h){ alert('Aporte não encontrado.'); return; }
+  _editAporteIdx = idx;
+  document.getElementById('edit-aporte-data').value = h.data||'';
+  document.getElementById('edit-aporte-valor').value = h.valor>0?N(h.valor):'';
+  openModal('modal-edit-aporte');
+}
+
+async function confirmEditAporte(){
+  if(_editAporteIdx < 0) return;
+  const p = provisionados.find(p=>(p._docId||p.id)===TERRENO_ID);
+  if(!p){ alert('Provisionado não encontrado.'); return; }
+  const data = document.getElementById('edit-aporte-data').value;
+  const valor = parseCurr(document.getElementById('edit-aporte-valor').value);
+  if(!data||!valor){ alert('Preencha data e valor.'); return; }
+  const historico = [...(p.historico||[])];
+  historico[_editAporteIdx] = {...historico[_editAporteIdx], data, valor};
+  const totalAcumulado = historico.reduce((s,h)=>s+h.valor, 0);
+  setSyncing();
+  try {
+    await window._fb.setDoc(
+      window._fb.doc(window._db,'provisionados',TERRENO_ID),
+      {valorTotal:totalAcumulado, historico},
+      {merge:true}
+    );
+    setSynced();
+    closeModal('modal-edit-aporte');
+    notify('Aporte atualizado!');
+    _editAporteIdx = -1;
+  } catch(e){ setSyncErr(); alert('Erro: '+e.message); }
+}
+
+// ══════════════════════════════════════════════════════════════
 //  DASHBOARD
 // ══════════════════════════════════════════════════════════════
 let cM,cD,cC;
@@ -2463,9 +2624,9 @@ function renderDash(){
 
   // Tabela somatória de Ofertas Direcionadas no Dashboard
   const dirTb=document.getElementById('dash-dir-table');
-  if(!direcionadas.length){
+  if(dirTb && !direcionadas.length){
     dirTb.innerHTML='<tr class="empty-row"><td colspan="4">Nenhuma oferta direcionada registrada</td></tr>';
-  } else {
+  } else if(dirTb){
     // Agrupar por desc+casa e somar
     const dirGroupMap={};
     direcionadas.forEach(d=>{
@@ -2489,7 +2650,7 @@ function renderDash(){
 
   const dtb=document.getElementById('dash-table');
   const recMap=mFiltered.flatMap(m=>(m.casas||[]).flatMap(b=>b.items.map(i=>({...i,_casa:b.casa,_data:m.data}))));
-  dtb.innerHTML=recMap.length ? recMap.slice(-10).reverse().map(i=>`
+  if(dtb) dtb.innerHTML=recMap.length ? recMap.slice(-10).reverse().map(i=>`
     <tr>
       <td class="mono" style="font-size:12px">${i._data}</td>
       <td style="max-width:190px">${i.desc}</td>
